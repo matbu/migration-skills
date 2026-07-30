@@ -18,7 +18,24 @@ mappings:
       - requirements.yml
     audience: external
     kind: feature
-    notes: "Install also mentioned in operator-aee-vmware.adoc"
+    notes: "Install also mentioned in operator-aee-vmware.adoc and operator-migrator-host.adoc"
+
+  - id: vmk-example-config
+    doc: source/operator-vmware-guide.adoc
+    code:
+      - vars.yaml
+      - localhost_inventory.yml
+    audience: external
+    kind: feature
+    notes: "Example inventory/vars in Usage section"
+
+  - id: vmk-workflow-diagrams
+    doc: source/operator-vmware-guide.adoc
+    code:
+      - doc/**
+    audience: external
+    kind: feature
+    notes: "NBDKit/CBT workflow SVGs embedded in guide"
 
   - id: vmk-playbook-migration
     doc: source/operator-vmware-guide.adoc
@@ -50,6 +67,24 @@ mappings:
     audience: external
     kind: role
 
+  - id: vmk-conversion-host-network
+    doc: source/operator-conversion-host-guide.adoc
+    code:
+      - roles/conversion_host/**
+    audience: external
+    kind: feature
+    status: partial
+    notes: "VMware as source / network requirements section; shared with OSM guide"
+
+  - id: vmk-prelude
+    doc: null
+    code:
+      - roles/prelude/**
+    audience: external
+    kind: role
+    status: undocumented
+    notes: "Hook role; used by conversion_host and import_volumes"
+
   - id: vmk-discovery
     doc: source/operator-vmware-guide.adoc
     code:
@@ -73,6 +108,8 @@ mappings:
       - playbooks/run_migration_from_conversion_host.yml
       - roles/import_workloads/**
       - plugins/modules/migrate.py
+      - plugins/modules/src/migrate/**
+      - plugins/module_utils/nbdkit/**
     audience: external
     kind: feature
 
@@ -80,24 +117,80 @@ mappings:
     doc: source/operator-vmware-guide.adoc
     code:
       - playbooks/migration_v2v.yml
+      - plugins/modules/import_vmware_volume.py
+      - plugins/module_utils/v2v_wrapper.py
     audience: external
     kind: playbook
+    notes: "Virt-v2v path; import_volumes.yml also uses import_vmware_volume"
 
   - id: vmk-import-volumes
     doc: null
     code:
       - playbooks/import_volumes.yml
-      - plugins/modules/import_vmware_volume.py
     audience: external
     kind: playbook
     status: undocumented
+
+  - id: vmk-modules-openstack
+    doc: null
+    code:
+      - plugins/modules/best_match_flavor.py
+      - plugins/modules/create_server.py
+      - plugins/modules/create_network_port.py
+      - plugins/modules/create_heat_stack.py
+      - plugins/modules/delete_server.py
+      - plugins/modules/delete_port.py
+      - plugins/modules/delete_volume.py
+      - plugins/modules/delete_flavor.py
+      - plugins/modules/flavor_info.py
+      - plugins/modules/volume_info.py
+      - plugins/modules/volume_metadata_info.py
+      - plugins/modules/generate_heat_template.py
+      - plugins/modules/import_flavor.py
+      - plugins/modules/export_flavor.py
+      - plugins/modules/warn.py
+      - plugins/doc_fragments/**
+    audience: external
+    kind: module
+    status: undocumented
+    notes: "No reference-module-*.adoc for VMK; modules-index is os-migrate only"
 
   - id: vmk-aee
     doc: source/operator-aee-vmware.adoc
     code:
       - aee/**
+      - .github/workflows/build-aee.yml
     audience: external
     kind: feature
+    notes: "Build/usage also covered in developer-aee.adoc (shared with os-migrate)"
+
+  - id: vmk-aee-developer
+    doc: source/developer-aee.adoc
+    code:
+      - aee/**
+    audience: internal
+    kind: feature
+    notes: "Shared AEE guide; VMK sections only"
+
+  - id: vmk-performance
+    doc: source/operator-performance-expectations.adoc
+    code:
+      - roles/import_workloads/**
+      - plugins/modules/migrate.py
+    audience: external
+    kind: feature
+    status: partial
+    notes: "Perf expectations for VMware path; no dedicated code tree"
+
+  - id: vmk-migrator-host
+    doc: source/operator-migrator-host.adoc
+    code:
+      - requirements.yml
+      - galaxy.yml
+    audience: external
+    kind: feature
+    status: partial
+    notes: "Mostly OSM-flavored; lists vmware.vmware / vmware.vmware_rest deps"
 
   - id: vmk-troubleshooting
     doc: source/operator-vmware-guide.adoc
@@ -115,6 +208,41 @@ mappings:
       - plugins/module_utils/**
     audience: internal
     kind: feature
+
+  - id: vmk-scripts
+    doc: source/developer-dev-create-new-golang-module.adoc
+    code:
+      - scripts/**
+      - Makefile
+    audience: internal
+    kind: feature
+    notes: "build.sh / Makefile compile path documented in golang module guide"
+
+  - id: vmk-tests
+    doc: source/developer-dev-create-new-golang-module.adoc
+    code:
+      - tests/**
+    audience: internal
+    kind: feature
+    notes: "sanity ignore files and ansible-test workarounds in golang module guide"
+
+  - id: vmk-meta
+    doc: null
+    code:
+      - meta/**
+    audience: internal
+    kind: feature
+    status: undocumented
+    notes: "Collection runtime metadata only (requires_ansible)"
+
+  - id: vmk-changelog
+    doc: null
+    code:
+      - CHANGELOG.md
+    audience: external
+    kind: feature
+    status: undocumented
+    notes: "No changelog.adoc in documentation repo"
 
   - id: vmk-ci
     doc: source/developer-github-actions.adoc

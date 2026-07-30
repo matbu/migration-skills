@@ -34,4 +34,4 @@ Each item under `mappings:` links one doc page (or a gap) to one or more code pa
 ### Path rules
 
 - **`code:`** — relative to the product repo root (os-migrate or vmware-migration-kit).
-- **`doc:`** — relative to the documentation repo root (e.g. `docs/src/user/...`).
+- **`doc:`** — relative to the documentation repo root (e.g. `source/operator-walkthrough.adoc`).

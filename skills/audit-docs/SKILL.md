@@ -1,7 +1,7 @@
 ---
 name: audit-docs
-description: Test audit of VMK code-to-docs mappings (read-only report)
-tags: [docs, audit, vmware-migration-kit]
+description: Audit code-to-docs mappings for VMware Migration Kit and os-migrate (read-only report)
+tags: [docs, audit, vmware-migration-kit, os-migrate]
 ---
 
 # Audit docs to code
@@ -13,13 +13,19 @@ All paths below are relative to this skill directory (`skills/audit-docs/`).
 ## Usage
 
 ```
+/audit-docs
+/audit-docs all
 /audit-docs vmware
+/audit-docs os-migrate
 /audit-docs vmware vmk-migrate-nbdkit
+/audit-docs os-migrate osm-walkthrough
 ```
 
 **Arguments:**
-- `vmware` (required) — check entries in `config/code-to-docs.vmware.yaml`
-- `id` (optional) — audit a single mapping by `id` (e.g. `vmk-migrate-nbdkit`)
+- `product` (optional, default `all`) — `all` | `vmware` | `os-migrate` (aliases: `vmk`, `osm`)
+  - **`all`** (default): audit **vmware-migration-kit first**, then **os-migrate**, in one report
+  - Single product: same format as before, one product only
+- `id` (optional) — audit a single mapping by `id` (e.g. `vmk-migrate-nbdkit`, `osm-walkthrough`). With `all`, the product is inferred from the `vmk-` / `osm-` prefix.
 
 ## Prerequisites
 
@@ -29,27 +35,55 @@ All paths below are relative to this skill directory (`skills/audit-docs/`).
 ## Steps
 
 1. Read `config/repos.yaml` and resolve local paths (expand `~`):
-   - Code: `code_repos.vmware-migration-kit.local_path`
+   - Code: `code_repos.vmware-migration-kit.local_path` and/or `code_repos.os-migrate.local_path`
    - Docs: `docs_repo.local_path`
-2. Read `config/code-to-docs.vmware.yaml`
+2. Read mapping YAML(s) in product order:
+   - VMware: `config/code-to-docs.vmware.yaml`
+   - os-migrate: `config/code-to-docs.os-migrate.yaml`
 3. For each mapping (or the one `id` if provided):
-   - Verify each `code:` path under the VMK repo root:
+   - Verify each `code:` path under the product repo root:
      - Single file: file must exist
-     - Glob (`**`): base directory must exist with at least one matching file
+     - Glob (`*`, `**`): at least one matching file (or base dir for `/**`)
    - If `doc` is not null, verify the path exists under the documentation repo root
    - If `doc` is null, list as **undocumented** (use `status` from mapping if set)
    - Set `paths_ok: true` only if all code paths pass and (doc is null OR doc file exists)
 4. Build the report data for each row:
    - `id`, `doc`, `doc_exists`, `paths_ok`, `code_ok`, `status`
+   - When `doc_exists` is true, also set `doc_url` from `docs_repo.url` in `repos.yaml`:
+     `{docs_repo.url}/blob/main/{doc}`
    - `status`: `mapped` (doc exists, paths OK), `undocumented` (doc null, code OK), `broken` (paths missing)
-5. Print a markdown summary table:
+5. **Cross-reference coverage** (always over the full YAML for that product, even if `id` is set):
+   - Inventory notable code units: `playbooks/*.yml`, `roles/*/`, `plugins/modules/*.py`, `.github/workflows/*`, plus `aee/`, `doc/`, `scripts/`, `tests/`, `meta/`
+   - Inventory product-related docs under `source/*.adoc` (filename hints and/or content)
+   - Compare against every `code:` / `doc:` already in that product’s mapping file
+   - Record gaps as `mapping_suggestions` (candidates to add — do **not** edit the YAML)
+6. Print markdown. **Combined (`all`) reports** use this order and keep the existing Summary / Mappings / suggestions structure **per product**:
+
+   ```markdown
+   # Audit report (YYYY-MM-DD-all)
+   ## Overall summary
+   ## vmware-migration-kit
+   ### Summary
+   ### Mappings
+   | id | paths OK | doc | status |
+   ### Mapping suggestions …
+   ## os-migrate
+   ### Summary
+   ### Mappings
+   …
+   ## Next step
+   ```
+
+   Single-product reports keep the previous title: `# Audit report — {product} ({audit_id})` with top-level `## Summary` / `## Mappings`.
+
+   For **mapped** rows, the status cell is a link to the doc source:
 
    | id | paths OK | doc | status |
    |----|----------|-----|--------|
-   | vmk-overview | yes | exists | mapped |
+   | vmk-overview | yes | exists | [mapped](https://github.com/os-migrate/documentation/blob/main/source/operator-vmware-guide.adoc) |
    | vmk-metadata-convert | yes | null | undocumented |
 
-6. **Save reports** (create `reports/` if missing):
+7. **Save reports** (create `reports/` if missing):
 
    ```
    reports/audit-report-{YYYY-MM-DD}.md
@@ -58,52 +92,63 @@ All paths below are relative to this skill directory (`skills/audit-docs/`).
 
    Use today's date. If both files already exist for that date, append `-2`, `-3`, etc.
 
-7. Summarize in chat: total mappings, mapped / undocumented / broken counts, and **full paths** to the saved report files
+8. Summarize in chat: overall totals, then per-product mapped / undocumented / broken and suggestion counts, and **full paths** to the saved report files
 
 ## Report JSON schema
 
-Skill 2 (`audit-docs-correctness`) reads this file. Use this structure:
+Skill 2 (`audit-docs-correctness`) reads this file.
+
+### Combined report (`product` = `all`, default)
 
 ```json
 {
-  "audit_id": "2026-07-01-vmware",
-  "product": "vmware-migration-kit",
+  "audit_id": "2026-07-01-all",
   "generated_at": "2026-07-01T14:00:00Z",
-  "code_repo_path": "/expanded/path/to/vmware-migration-kit",
   "docs_repo_path": "/expanded/path/to/documentation",
+  "docs_repo_url": "https://github.com/os-migrate/documentation",
   "summary": {
-    "total": 15,
-    "mapped": 12,
-    "undocumented": 3,
-    "broken": 0
+    "total": 136,
+    "mapped": 124,
+    "undocumented": 10,
+    "broken": 2
   },
-  "mappings": [
+  "products": [
     {
-      "id": "vmk-overview",
-      "paths_ok": true,
-      "code_ok": true,
-      "doc": "source/operator-vmware-guide.adoc",
-      "doc_exists": true,
-      "status": "mapped",
-      "broken_paths": []
+      "product": "vmware-migration-kit",
+      "product_key": "vmware",
+      "code_repo_path": "/expanded/path/to/vmware-migration-kit",
+      "code_repo_url": "https://github.com/os-migrate/vmware-migration-kit",
+      "summary": { "total": 22, "mapped": 17, "undocumented": 5, "broken": 0 },
+      "mappings": [ { "id": "vmk-overview", "paths_ok": true, "status": "mapped", "doc_url": "..." } ],
+      "mapping_suggestions": { "summary": { "unmapped_code": 3, "unmapped_docs": 0 }, "unmapped_code": [], "unmapped_docs": [] }
     },
     {
-      "id": "vmk-metadata-convert",
-      "paths_ok": true,
-      "code_ok": true,
-      "doc": null,
-      "doc_exists": false,
-      "status": "undocumented",
-      "broken_paths": []
+      "product": "os-migrate",
+      "product_key": "os-migrate",
+      "code_repo_path": "/expanded/path/to/os-migrate",
+      "code_repo_url": "https://github.com/os-migrate/os-migrate",
+      "summary": { "total": 114, "mapped": 107, "undocumented": 5, "broken": 0 },
+      "mappings": [],
+      "mapping_suggestions": { "summary": { "unmapped_code": 0, "unmapped_docs": 0 }, "unmapped_code": [], "unmapped_docs": [] }
     }
   ]
 }
 ```
 
-The markdown report should contain the same summary table plus a **Next step** line:
+`products` is always **vmware-migration-kit first**, then **os-migrate**.
+
+### Single-product report
+
+Same row fields as before. Also includes a one-element `products` array. Top-level `product`, `mappings`, and `mapping_suggestions` are set for backward compatibility.
+
+- `doc_url`: present when `doc_exists` is true; omit otherwise
+- Markdown `status` for mapped rows: `[mapped]({doc_url})`
+- `mapping_suggestions`: end-of-section candidates **not** in that product’s `code-to-docs*.yaml`; suggestions only (never auto-edit the YAML)
+
+Next step line for combined reports:
 
 ```text
-Next: /audit-docs-correctness vmware reports/audit-report-{YYYY-MM-DD}.json
+Next: /audit-docs-correctness reports/audit-report-{YYYY-MM-DD}.json
 ```
 
 ## Rules
@@ -128,10 +173,13 @@ You are responsible for executing the steps above when the user invokes `/audit-
 From the skill directory (`skills/audit-docs/`), run:
 
 ```bash
+./scripts/audit-paths.sh
+./scripts/audit-paths.sh all
 ./scripts/audit-paths.sh vmware
+./scripts/audit-paths.sh os-migrate
 ./scripts/audit-paths.sh vmware vmk-migrate-nbdkit
 ```
 
-The script reads `config/repos.yaml` and `config/code-to-docs.vmware.yaml`, checks paths, and writes reports under `reports/`.
+The script defaults to **both products** (VMware then os-migrate), reads `config/repos.yaml` and the matching `code-to-docs*.yaml` files, checks paths, cross-references for unmapped coverage, and writes reports under `reports/`.
 
 On success, print the script output (summary + `AUDIT_JSON=` / `AUDIT_MD=` lines). Do not re-implement the audit in inline Python.
