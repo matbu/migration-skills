@@ -91,8 +91,9 @@ const REPORT_SCHEMA = {
 
 // ─── Parse args and flags ─────────────────────────────────────────────────────
 // Usage:
-//   virtctl mode (default): <conv-host-ip> --devstack=ubuntu@vmi/... [--identity-file=...] [--ns=...] [--instance-key=...] [--user=...] [--vcenter=...]
-//   direct SSH mode:        <conv-host-ip> --via=ssh --ssh-key=~/.ssh/... [--user=...] [--vcenter=...]
+//   virtctl mode (default):  <conv-host-ip> --devstack=ubuntu@vmi/... [--identity-file=...] [--ns=...] [--instance-key=...] [--user=...] [--vcenter=...]
+//   ssh-devstack mode:       <conv-host-ip> --via=ssh-devstack --devstack-ssh=stack@<devstack-ip> --devstack-key=~/.ssh/key [--instance-key=...] [--user=...] [--vcenter=...]
+//   direct SSH mode:         <conv-host-ip> --via=ssh --ssh-key=~/.ssh/... [--user=...] [--vcenter=...]
 
 const allArgs = (() => {
   if (Array.isArray(args)) return args;
@@ -113,7 +114,7 @@ const getFlag = (prefix, fallback) => {
 };
 
 // Connection args
-const convHostArg  = positionalArgs[0] || '';   // e.g. <conv-host-fip> or cloud-user@<conv-host-fip>
+const convHostArg  = positionalArgs[0] || '';   // e.g. 172.24.0.211 or cloud-user@172.24.0.211
 const convHostIp   = convHostArg.includes('@') ? convHostArg.split('@')[1] : convHostArg;
 const convHostUser = convHostArg.includes('@') ? convHostArg.split('@')[0]
                    : getFlag('--user=', 'cloud-user');
@@ -127,48 +128,72 @@ if (!convHostIp) {
   );
 }
 
-const via          = getFlag('--via=', 'virtctl');   // 'virtctl' | 'ssh'
-const devstackVmi  = getFlag('--devstack=', '');     // e.g. ubuntu@vmi/<dst-vmi-name>
-const ns           = getFlag('--ns=', '');
-const identityFile = getFlag('--identity-file=', '~/.ssh/id_rsa');
-const instanceKey  = getFlag('--instance-key=', '/opt/stack/.ssh/conv_host'); // key PATH ON the devstack
-const localSshKey  = getFlag('--ssh-key=', '~/.ssh/id_rsa');                   // local key for direct SSH
-const vcenter      = getFlag('--vcenter=', '');      // vCenter IP or FQDN (optional)
-const osAuthUrl    = getFlag('--openstack-url=', '');
+const via           = getFlag('--via=', 'virtctl');          // 'virtctl' | 'ssh-devstack' | 'ssh'
+const devstackVmi   = getFlag('--devstack=', '');             // virtctl: e.g. ubuntu@vmi/ubuntu-noble-ci-vm-2
+const ns            = getFlag('--ns=', '');                   // virtctl: Kubernetes namespace
+const identityFile  = getFlag('--identity-file=', '~/.ssh/id_rsa');
+const devstackSsh   = getFlag('--devstack-ssh=', '');         // ssh-devstack: e.g. stack@<devstack-ip>
+const devstackKey   = getFlag('--devstack-key=', '~/.ssh/id_rsa'); // ssh-devstack: local key for devstack SSH
+const instanceKey   = getFlag('--instance-key=', '/opt/stack/.ssh/conv_host'); // key PATH ON the devstack
+const localSshKey   = getFlag('--ssh-key=', '~/.ssh/id_rsa'); // direct ssh: local key for conv-host
+const vcenter       = getFlag('--vcenter=', '');
+const osAuthUrl     = getFlag('--openstack-url=', '');
 
 if (via === 'virtctl' && !devstackVmi) {
   throw new Error(
     'virtctl mode requires --devstack=ubuntu@vmi/<name>.\n' +
-    'Either pass --devstack or use --via=ssh for direct SSH access.'
+    'For plain SSH devstack: --via=ssh-devstack --devstack-ssh=stack@<ip> --devstack-key=~/.ssh/key\n' +
+    'For direct conv-host SSH: --via=ssh --ssh-key=~/.ssh/key'
   );
 }
 if (via === 'virtctl' && !ns) {
   throw new Error('virtctl mode requires --ns=<namespace>. Pass your Kubernetes namespace.');
 }
+if (via === 'ssh-devstack' && !devstackSsh) {
+  throw new Error(
+    'ssh-devstack mode requires --devstack-ssh=<user>@<ip>.\n' +
+    'Example: --via=ssh-devstack --devstack-ssh=stack@<devstack-ip> --devstack-key=~/.ssh/conv_host_psi_vmware'
+  );
+}
 
-// ─── SSH helper ───────────────────────────────────────────────────────────────
-// Returns the shell command string to run `cmd` on the conversion host.
-const vcBase = `virtctl -n ${ns} ssh --identity-file="${identityFile}" --local-ssh-opts='-o IdentitiesOnly=yes'`;
+// ─── SSH helpers ─────────────────────────────────────────────────────────────
+// virtctl base command (used only in virtctl mode)
+const vcBase = ns
+  ? `virtctl -n ${ns} ssh --identity-file="${identityFile}" --local-ssh-opts='-o IdentitiesOnly=yes'`
+  : '';
 
+// Plain SSH to the devstack (used only in ssh-devstack mode)
+const dsBase = `ssh -i ${devstackKey} -o StrictHostKeyChecking=no -o ConnectTimeout=15 ${devstackSsh}`;
+
+// Run a command on the conversion host — handles all three modes
 const convSsh = (cmd) => {
   if (via === 'ssh') {
-    // Direct SSH from local machine
+    // Direct SSH from local machine → conversion host
     return `ssh -i ${localSshKey} -o StrictHostKeyChecking=no -o ConnectTimeout=15 ${convHostUser}@${convHostIp} "${cmd}"`;
   }
-  // Via devstack: virtctl → devstack → conversion host
+  if (via === 'ssh-devstack') {
+    // SSH → devstack → conversion host (two-hop plain SSH)
+    return `${dsBase} "ssh -i ${instanceKey} -o StrictHostKeyChecking=no -o ConnectTimeout=15 ${convHostUser}@${convHostIp} '${cmd}'"`;
+  }
+  // virtctl → devstack VMI → conversion host
   return `${vcBase} ${devstackVmi} -c "ssh -i ${instanceKey} -o StrictHostKeyChecking=no -o ConnectTimeout=15 ${convHostUser}@${convHostIp} '${cmd}'"`;
 };
 
 // Describe how to reach the conversion host (for agent prompts)
-const accessDescription = via === 'ssh'
-  ? `Direct SSH: ssh -i ${localSshKey} -o StrictHostKeyChecking=no ${convHostUser}@${convHostIp} "CMD"`
-  : `Via devstack VMI (virtctl → devstack → instance):\n  ${vcBase} ${devstackVmi} -c "ssh -i ${instanceKey} -o StrictHostKeyChecking=no ${convHostUser}@${convHostIp} 'CMD'"`;
+const accessDescription =
+  via === 'ssh'
+    ? `Direct SSH:\n  ssh -i ${localSshKey} -o StrictHostKeyChecking=no ${convHostUser}@${convHostIp} "CMD"`
+  : via === 'ssh-devstack'
+    ? `Via devstack (plain SSH → devstack → instance):\n  ${dsBase} "ssh -i ${instanceKey} -o StrictHostKeyChecking=no ${convHostUser}@${convHostIp} 'CMD'"\n\nNOTE: The devstack SSH key for the FIRST hop is ${devstackKey}.\nThe instance key (on the devstack) for the SECOND hop is ${instanceKey}.\nIf the instance key requires sudo on the devstack, prepend: sudo cp ${instanceKey} /tmp/conv_key_tmp && sudo chmod 644 /tmp/conv_key_tmp`
+    : `Via devstack VMI (virtctl → devstack → instance):\n  ${vcBase} ${devstackVmi} -c "ssh -i ${instanceKey} -o StrictHostKeyChecking=no ${convHostUser}@${convHostIp} 'CMD'"`;
 
-log(`Conversion host: ${convHostUser}@${convHostIp}`);
-log(`Access mode    : ${via}`);
-if (via === 'virtctl') log(`Devstack VMI   : ${devstackVmi}`);
-if (vcenter)   log(`vCenter target : ${vcenter}`);
-if (osAuthUrl) log(`OpenStack URL  : ${osAuthUrl}`);
+log(`Conversion host : ${convHostUser}@${convHostIp}`);
+log(`Access mode     : ${via}`);
+if (via === 'virtctl')      log(`Devstack VMI    : ${devstackVmi} (ns: ${ns})`);
+if (via === 'ssh-devstack') log(`Devstack SSH    : ${devstackSsh} (key: ${devstackKey})`);
+if (via === 'ssh-devstack') log(`Instance key    : ${instanceKey} (on devstack)`);
+if (vcenter)   log(`vCenter target  : ${vcenter}`);
+if (osAuthUrl) log(`OpenStack URL   : ${osAuthUrl}`);
 
 // ─── PHASE: Preflight ─────────────────────────────────────────────────────────
 
@@ -186,12 +211,27 @@ Run the following commands:
 1. Test SSH:
    ${convSsh('echo SSH_OK && hostname -f && cat /etc/os-release | head -3')}
 
-2. If SSH fails:
-   - In virtctl mode: first verify devstack login with:
-     ${vcBase} ${devstackVmi} -c "echo DEVSTACK_OK"
-   - Check if the instance key exists on devstack:
-     ${vcBase} ${devstackVmi} -c "ls -la ${instanceKey} 2>&1"
-   - Try alternative users (centos, ubuntu, ec2-user) if cloud-user fails
+2. If SSH fails with "Permission denied" on the instance key:
+   The key at ${instanceKey} may only be readable by root on the devstack.
+   Copy it to a temp location with sudo first, then retry:
+${via === 'ssh-devstack'
+  ? `   ${dsBase} "sudo cp ${instanceKey} /tmp/conv_host_tmp && sudo chmod 644 /tmp/conv_host_tmp"
+   Then retry: ${dsBase} "ssh -i /tmp/conv_host_tmp -o StrictHostKeyChecking=no -o ConnectTimeout=15 ${convHostUser}@${convHostIp} 'echo SSH_OK && hostname -f && cat /etc/os-release | head -3'"`
+  : `   ${vcBase} ${devstackVmi} -c "sudo cp ${instanceKey} /tmp/conv_host_tmp && sudo chmod 644 /tmp/conv_host_tmp"
+   Then retry: ${vcBase} ${devstackVmi} -c "ssh -i /tmp/conv_host_tmp -o StrictHostKeyChecking=no -o ConnectTimeout=15 ${convHostUser}@${convHostIp} 'echo SSH_OK && hostname -f && cat /etc/os-release | head -3'"`}
+
+3. If SSH still fails:
+${via === 'ssh-devstack'
+  ? `   - Verify devstack SSH: ${dsBase} "echo DEVSTACK_OK"
+   - Check key exists on devstack: ${dsBase} "ls -la ${instanceKey} 2>&1"
+   - Try alternative users (centos, ubuntu, ec2-user) if cloud-user fails`
+  : `   - Verify devstack login: ${vcBase} ${devstackVmi} -c "echo DEVSTACK_OK"
+   - Check if the key exists: ${vcBase} ${devstackVmi} -c "ls -la ${instanceKey} 2>&1"
+   - Try alternative users (centos, ubuntu, ec2-user) if cloud-user fails`}
+
+IMPORTANT: If you used /tmp/conv_host_tmp to connect, update the instance key path
+in your mind for subsequent commands in this session — use /tmp/conv_host_tmp instead
+of ${instanceKey}.
 
 Return:
   reachable   = true/false
@@ -206,7 +246,7 @@ if (!preflight || !preflight.reachable) {
   log(preflight?.error || 'SSH failed. Check IP, key, and network path.');
   return {
     status: 'error',
-    message: `Cannot reach conversion host ${convHostUser}@${convHostIp}.\n${preflight?.error || ''}\n\nCheck:\n  - Is the floating IP correct?\n  - Does the key exist? ${via === 'virtctl' ? `(${instanceKey} on devstack)` : `(${localSshKey} locally)`}\n  - Is port 22 open on the conversion host?`,
+    message: `Cannot reach conversion host ${convHostUser}@${convHostIp}.\n${preflight?.error || ''}\n\nCheck:\n  - Is the floating IP correct?\n  - Does the key exist? ${via === 'ssh' ? `(${localSshKey} locally)` : via === 'ssh-devstack' ? `(${instanceKey} on devstack at ${devstackSsh})` : `(${instanceKey} on devstack VMI ${devstackVmi})`}\n  - Is port 22 open on the conversion host?`,
   };
 }
 log(`Connected: ${preflight.hostname || convHostIp} (${preflight.os_release || 'unknown OS'})`);

@@ -36,20 +36,29 @@ Present results in a structured format with a `COMMANDS TO RUN` runbook at the e
 ## Usage
 
 ```bash
-# Via devstack VMI (default — requires --devstack)
+# ── Mode 1: Via devstack VMI accessed through virtctl (KubeVirt/OCP) ──────────
 /check-conv-host <conv-host-fip> \
-  --devstack=ubuntu@vmi/<dst-vmi-name> \
+  --devstack=ubuntu@vmi/<devstack-vmi-name> \
   --identity-file=~/.ssh/your_key \
   --ns=<your-namespace> \
-  --vcenter=192.168.1.100
-
-# With vCenter FQDN
-/check-conv-host <conv-host-fip> \
-  --devstack=ubuntu@vmi/<dst-vmi-name> \
-  --identity-file=~/.ssh/your_key \
   --vcenter=vcenter.domain.local
 
-# Direct SSH (no devstack hop)
+# ── Mode 2: Via devstack accessed via plain SSH ────────────────────────────────
+/check-conv-host <conv-host-fip> \
+  --via=ssh-devstack \
+  --devstack-ssh=stack@<devstack-ip> \
+  --devstack-key=~/.ssh/conv_host_psi_vmware \
+  --vcenter=vcenter.domain.local
+
+# With custom instance key path (both virtctl and ssh-devstack)
+/check-conv-host <conv-host-fip> \
+  --via=ssh-devstack \
+  --devstack-ssh=stack@<devstack-ip> \
+  --devstack-key=~/.ssh/conv_host_psi_vmware \
+  --instance-key=/opt/stack/.ssh/conv_host \
+  --vcenter=vcenter.domain.local
+
+# ── Mode 3: Direct SSH to the conversion host (no devstack hop) ───────────────
 /check-conv-host <conv-host-fip> \
   --via=ssh \
   --ssh-key=~/.ssh/conv_host_key \
@@ -60,67 +69,76 @@ Present results in a structured format with a `COMMANDS TO RUN` runbook at the e
   --via=ssh \
   --ssh-key=~/.ssh/conv_key \
   --vcenter=vcenter.domain.local \
-  --openstack-url=http://192.168.121.2/identity
-
-# With custom instance key path on devstack
-/check-conv-host <conv-host-fip> \
-  --devstack=ubuntu@vmi/<dst-vmi-name> \
-  --identity-file=~/.ssh/your_key \
-  --instance-key=/opt/stack/.ssh/conv_host \
-  --vcenter=vcenter.domain.local
+  --openstack-url=http://172.24.0.1/identity
 ```
 
 ## Arguments
 
 | Position | Argument | Description |
 |----------|----------|-------------|
-| 1 | `conv_host` | Conversion host IP or `user@ip` (e.g. `<conv-host-fip>` or `cloud-user@<conv-host-fip>`) |
+| 1 | `conv_host` | Conversion host IP or `user@ip` (e.g. `172.24.0.211` or `cloud-user@172.24.0.211`) |
 
 ## Flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--via=<mode>` | `virtctl` | Access mode: `virtctl` (via devstack) or `ssh` (direct) |
-| `--devstack=<vmi>` | — | Devstack VMI ref (required for virtctl mode, e.g. `ubuntu@vmi/<dst-vmi-name>`) |
-| `--ns=<namespace>` | — | Kubernetes namespace for virtctl |
+| `--via=<mode>` | `virtctl` | Access mode: `virtctl`, `ssh-devstack`, or `ssh` |
+| `--devstack=<vmi>` | — | Devstack VMI ref for virtctl mode (e.g. `ubuntu@vmi/<name>`) |
+| `--ns=<namespace>` | — | Kubernetes namespace for virtctl (**required** for virtctl mode) |
 | `--identity-file=<path>` | `~/.ssh/id_rsa` | SSH identity file for virtctl |
-| `--instance-key=<path>` | `/opt/stack/.ssh/conv_host` | Path to instance SSH key **on the devstack** (virtctl mode) |
-| `--ssh-key=<path>` | `~/.ssh/id_rsa` | Local SSH key for direct SSH mode |
+| `--devstack-ssh=<user@ip>` | — | Devstack SSH address for ssh-devstack mode (e.g. `stack@<devstack-ip>`) |
+| `--devstack-key=<path>` | `~/.ssh/id_rsa` | **Local** SSH key to reach the devstack (ssh-devstack mode) |
+| `--instance-key=<path>` | `/opt/stack/.ssh/conv_host` | Key path **on the devstack** to reach the conversion host (virtctl + ssh-devstack modes) |
+| `--ssh-key=<path>` | `~/.ssh/id_rsa` | Local SSH key for direct `--via=ssh` mode |
 | `--user=<user>` | `cloud-user` | SSH user for the conversion host |
-| `--vcenter=<ip-or-fqdn>` | — | vCenter IP or FQDN (optional — port 443/902 checks are skipped if absent) |
+| `--vcenter=<ip-or-fqdn>` | — | vCenter IP or FQDN (optional — port 443/902 checks skipped if absent) |
 | `--openstack-url=<url>` | — | OpenStack auth URL to test reachability (optional) |
 
 ## Access Modes
 
-### virtctl (default)
-
-Reaches the conversion host by tunnelling through the devstack VMI via `virtctl`:
+### virtctl (default) — devstack on OCP/KubeVirt
 
 ```
-local → virtctl → devstack VM → SSH → conversion host
+local → virtctl → devstack VMI → SSH → conversion host
 ```
 
 ```bash
-# SSH command pattern:
-virtctl -n <your-namespace> ssh \
-  --identity-file="~/.ssh/your_key" \
-  --local-ssh-opts='-o IdentitiesOnly=yes' \
-  ubuntu@vmi/<dst-vmi-name> \
-  -c "ssh -i /opt/stack/.ssh/conv_host -o StrictHostKeyChecking=no cloud-user@<conv-host-fip> 'CMD'"
+virtctl -n <namespace> ssh --identity-file="~/.ssh/your_key" \
+  --local-ssh-opts='-o IdentitiesOnly=yes' ubuntu@vmi/<devstack-vmi-name> \
+  -c "ssh -i /opt/stack/.ssh/conv_host -o StrictHostKeyChecking=no cloud-user@<fip> 'CMD'"
 ```
 
-Note: `virtctl -- nc %h %p` ProxyCommand does **not** work with virtctl ≤ 1.8.x.
-The skill uses the two-hop SSH approach instead.
+Note: `virtctl -- nc %h %p` ProxyCommand does **not** work with virtctl ≤ 1.8.x — the skill uses the two-hop SSH approach.
 
-### Direct SSH
+### ssh-devstack — devstack accessible via plain SSH
 
-SSH directly from the local machine to the conversion host:
+Use this when the devstack is a regular server (not a KubeVirt VMI), e.g. a PSI baremetal or a standalone VM:
+
+```
+local → SSH → devstack → SSH → conversion host
+```
+
+```bash
+# First hop (local → devstack):
+ssh -i ~/.ssh/conv_host_psi_vmware -o StrictHostKeyChecking=no stack@<devstack-ip>
+
+# Second hop (devstack → conversion host, using instance key ON the devstack):
+ssh -i /opt/stack/.ssh/conv_host -o StrictHostKeyChecking=no cloud-user@<conv-host-fip> "CMD"
+
+# Combined single command:
+ssh -i ~/.ssh/conv_host_psi_vmware stack@<devstack-ip> \
+  "ssh -i /opt/stack/.ssh/conv_host -o StrictHostKeyChecking=no cloud-user@<fip> 'CMD'"
+```
+
+### ssh (direct) — conversion host directly reachable
+
+```
+local → SSH → conversion host
+```
 
 ```bash
 ssh -i ~/.ssh/conv_host_key -o StrictHostKeyChecking=no cloud-user@<conv-host-fip> "CMD"
 ```
-
-Use this when the conversion host's floating IP is directly reachable.
 
 ## Phases
 
