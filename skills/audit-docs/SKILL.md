@@ -57,7 +57,12 @@ All paths below are relative to this skill directory (`skills/audit-docs/`).
    - Inventory product-related docs under `source/*.adoc` (filename hints and/or content)
    - Compare against every `code:` / `doc:` already in that product’s mapping file
    - Record gaps as `mapping_suggestions` (candidates to add — do **not** edit the YAML)
-6. Print markdown. **Combined (`all`) reports** use this order and keep the existing Summary / Mappings / suggestions structure **per product**:
+6. **Generate copy-paste mapping stanzas** (suggestions only — do **not** edit the YAML):
+   - **Add** — one stanza per `mapping_suggestions.unmapped_code` row (code in repo but not in any mapping entry)
+   - **Update** — one stanza per existing `doc: null` mapping where doc text mentions the mapped code paths
+   - Each stanza is a complete mapping entry (`id`, `doc`, `code`, `audience`, `kind`, optional `status` / `notes`) ready to paste under `mappings:` in the matching `code-to-docs*.yaml`
+   - Skip stanzas for unmapped docs (no `code:` paths known) and for `doc: null` rows with no doc mention hit
+7. Print markdown. **Combined (`all`) reports** use this order and keep the existing Summary / Mappings / suggestions structure **per product**:
 
    ```markdown
    # Audit report (YYYY-MM-DD-all)
@@ -67,6 +72,7 @@ All paths below are relative to this skill directory (`skills/audit-docs/`).
    ### Mappings
    | id | paths OK | doc | status |
    ### Mapping suggestions …
+   ### Suggested mapping stanzas …
    ## os-migrate
    ### Summary
    ### Mappings
@@ -83,7 +89,42 @@ All paths below are relative to this skill directory (`skills/audit-docs/`).
    | vmk-overview | yes | exists | [mapped](https://github.com/os-migrate/documentation/blob/main/source/operator-vmware-guide.adoc) |
    | vmk-metadata-convert | yes | null | undocumented |
 
-7. **Save reports** (create `reports/` if missing):
+   **Suggested mapping stanzas** (per product, after Mapping suggestions):
+
+   ````markdown
+   ### Suggested mapping stanzas
+
+   Copy-paste into `config/code-to-docs.vmware.yaml` under `mappings:` after review.
+   This run did not modify any mapping file.
+
+   #### Add (2)
+
+   ```yaml
+     - id: vmk-new-role
+       doc: null
+       code:
+         - roles/new_role/**
+       audience: external
+       kind: role
+       status: undocumented
+   ```
+
+   #### Update existing rows (1)
+
+   Replace the matching `id` block in the YAML:
+
+   ```yaml
+     - id: vmk-prelude
+       doc: source/operator-vmware-guide.adoc
+       code:
+         - roles/prelude/**
+       audience: external
+       kind: role
+       notes: "Hook role; Suggested doc link; was doc: null"
+   ```
+   ````
+
+8. **Save reports** (create `reports/` if missing):
 
    ```
    reports/audit-report-{YYYY-MM-DD}.md
@@ -92,7 +133,7 @@ All paths below are relative to this skill directory (`skills/audit-docs/`).
 
    Use today's date. If both files already exist for that date, append `-2`, `-3`, etc.
 
-8. Summarize in chat: overall totals, then per-product mapped / undocumented / broken and suggestion counts, and **full paths** to the saved report files
+9. Summarize in chat: overall totals, then per-product mapped / undocumented / broken, suggestion counts, **stanza add/update counts**, and **full paths** to the saved report files
 
 ## Report JSON schema
 
@@ -120,7 +161,21 @@ Skill 2 (`audit-docs-correctness`) reads this file.
       "code_repo_url": "https://github.com/os-migrate/vmware-migration-kit",
       "summary": { "total": 22, "mapped": 17, "undocumented": 5, "broken": 0 },
       "mappings": [ { "id": "vmk-overview", "paths_ok": true, "status": "mapped", "doc_url": "..." } ],
-      "mapping_suggestions": { "summary": { "unmapped_code": 3, "unmapped_docs": 0 }, "unmapped_code": [], "unmapped_docs": [] }
+      "mapping_suggestions": { "summary": { "unmapped_code": 3, "unmapped_docs": 0 }, "unmapped_code": [], "unmapped_docs": [] },
+      "mapping_stanzas": {
+        "summary": { "add": 2, "update": 1 },
+        "add": [
+          {
+            "action": "add",
+            "target_file": "code-to-docs.vmware.yaml",
+            "mapping_id": "vmk-new-role",
+            "entry": { "id": "vmk-new-role", "doc": null, "code": ["roles/new_role/**"] },
+            "yaml": "  - id: vmk-new-role\n    ...",
+            "reason": "code path not listed in any mapping"
+          }
+        ],
+        "update": []
+      }
     },
     {
       "product": "os-migrate",
@@ -139,15 +194,20 @@ Skill 2 (`audit-docs-correctness`) reads this file.
 
 ### Single-product report
 
-Same row fields as before. Also includes a one-element `products` array. Top-level `product`, `mappings`, and `mapping_suggestions` are set for backward compatibility.
+Same row fields as before. Also includes a one-element `products` array. Top-level `product`, `mappings`, `mapping_suggestions`, and `mapping_stanzas` are set for backward compatibility.
 
 - `doc_url`: present when `doc_exists` is true; omit otherwise
 - Markdown `status` for mapped rows: `[mapped]({doc_url})`
 - `mapping_suggestions`: end-of-section candidates **not** in that product’s `code-to-docs*.yaml`; suggestions only (never auto-edit the YAML)
+- `mapping_stanzas`: copy-paste YAML blocks for **add** (unmapped code) and **update** (`doc: null` rows with doc hits); suggestions only (never auto-edit the YAML)
 
-Next step line for combined reports:
+Next step lines for combined reports:
 
 ```text
+Optional (after pasting mapping stanzas into code-to-docs YAML):
+Next: /audit-docs-drafts reports/audit-report-{YYYY-MM-DD}.json
+
+When docs are mapped (doc: set in YAML):
 Next: /audit-docs-correctness reports/audit-report-{YYYY-MM-DD}.json
 ```
 
@@ -155,6 +215,7 @@ Next: /audit-docs-correctness reports/audit-report-{YYYY-MM-DD}.json
 
 - Read-only on product repos and `config/code-to-docs*.yaml`
 - **May write** only to `reports/` under this skill directory
+- **Stanzas are suggestions only** — human reviews and pastes into `code-to-docs*.yaml`; never auto-edit mapping files
 - If a local clone is missing, report which `repos.yaml` path failed and stop (do not write partial reports)
 - See `config/README.md` for mapping field meanings
 
@@ -180,6 +241,6 @@ From the skill directory (`skills/audit-docs/`), run:
 ./scripts/audit-paths.sh vmware vmk-migrate-nbdkit
 ```
 
-The script defaults to **both products** (VMware then os-migrate), reads `config/repos.yaml` and the matching `code-to-docs*.yaml` files, checks paths, cross-references for unmapped coverage, and writes reports under `reports/`.
+The script defaults to **both products** (VMware then os-migrate), reads `config/repos.yaml` and the matching `code-to-docs*.yaml` files, checks paths, cross-references for unmapped coverage, builds copy-paste mapping stanzas, and writes reports under `reports/`.
 
-On success, print the script output (summary + `AUDIT_JSON=` / `AUDIT_MD=` lines). Do not re-implement the audit in inline Python.
+On success, print the script output (summary + `AUDIT_JSON=` / `AUDIT_MD=` lines, plus per-product `STANZAS add=… update=…`). Mention stanza counts in the chat summary when non-zero. Do not re-implement the audit in inline Python.

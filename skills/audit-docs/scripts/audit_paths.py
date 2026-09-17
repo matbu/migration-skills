@@ -449,6 +449,273 @@ def discover_unmapped(
     }
 
 
+def infer_audience(kind: str) -> str:
+    """Return audience for a mapping kind (matches existing YAML convention)."""
+    return "internal" if kind == "ci" else "external"
+
+
+def resolve_unique_id(suggested_id: str, existing_ids: set[str]) -> str:
+    """Return suggested_id or append -2, -3, ... when already used."""
+    if suggested_id not in existing_ids:
+        return suggested_id
+    n = 2
+    while f"{suggested_id}-{n}" in existing_ids:
+        n += 1
+    return f"{suggested_id}-{n}"
+
+
+def build_mapping_entry(
+    *,
+    mapping_id: str,
+    doc: str | None,
+    code: list[str],
+    kind: str,
+    audience: str | None = None,
+    status: str | None = None,
+    notes: str | None = None,
+) -> dict[str, Any]:
+    """Build one mapping dict matching code-to-docs YAML shape."""
+    entry: dict[str, Any] = {
+        "id": mapping_id,
+        "doc": doc,
+        "code": code,
+        "audience": audience or infer_audience(kind),
+        "kind": kind,
+    }
+    if doc is None:
+        entry["status"] = status or "undocumented"
+    elif status:
+        entry["status"] = status
+    if notes:
+        entry["notes"] = notes
+    return entry
+
+
+def format_stanza_yaml(entry: dict[str, Any]) -> str:
+    """Serialize one mapping item for paste under mappings: (2-space indent)."""
+    lines = [f"  - id: {entry['id']}"]
+    doc = entry.get("doc")
+    lines.append("    doc: null" if doc is None else f"    doc: {doc}")
+    lines.append("    code:")
+    for cp in entry.get("code") or []:
+        lines.append(f"      - {cp}")
+    lines.append(f"    audience: {entry.get('audience', 'external')}")
+    lines.append(f"    kind: {entry.get('kind', 'feature')}")
+    if entry.get("status"):
+        lines.append(f"    status: {entry['status']}")
+    notes = entry.get("notes")
+    if notes:
+        notes_str = str(notes)
+        if any(c in notes_str for c in ':"\'{}[],&*#?|-<>=!%@`'):
+            escaped = notes_str.replace("\\", "\\\\").replace('"', '\\"')
+            lines.append(f'    notes: "{escaped}"')
+        else:
+            lines.append(f"    notes: {notes_str}")
+    return "\n".join(lines)
+
+
+def build_stanza_record(
+    action: str,
+    target_file: str,
+    entry: dict[str, Any],
+    reason: str,
+) -> dict[str, Any]:
+    return {
+        "action": action,
+        "target_file": target_file,
+        "mapping_id": entry["id"],
+        "entry": entry,
+        "yaml": format_stanza_yaml(entry),
+        "reason": reason,
+    }
+
+
+def needles_for_code_patterns(code_paths: list[str]) -> list[str]:
+    """Collect doc-search needles from mapping code: paths (incl. globs)."""
+    needles: list[str] = []
+    seen: set[str] = set()
+    for cp in code_paths:
+        pat = str(cp)
+        if "/**" in pat:
+            unit = pat.split("/**")[0] + "/"
+        elif "*" in pat or "?" in pat or "[" in pat:
+            unit = pat.split("*")[0].rstrip("/")
+            if unit:
+                unit += "/"
+            else:
+                unit = pat
+        else:
+            unit = pat
+        for needle in mention_needles_for_code(unit):
+            if needle not in seen:
+                seen.add(needle)
+                needles.append(needle)
+    return needles
+
+
+def build_new_stanzas(
+    unmapped_code: list[dict[str, Any]],
+    existing_ids: set[str],
+    target_file: str,
+) -> list[dict[str, Any]]:
+    """Copy-paste stanzas for code not yet in the mapping YAML."""
+    stanzas: list[dict[str, Any]] = []
+    used_ids = set(existing_ids)
+    for item in unmapped_code:
+        mapping_id = resolve_unique_id(item.get("suggested_id") or "unknown", used_ids)
+        used_ids.add(mapping_id)
+        doc = item.get("suggested_doc")
+        kind = item.get("kind") or "feature"
+        notes: str | None = None
+        mentions = item.get("doc_mentions") or []
+        if not doc:
+            notes = item.get("reason")
+        elif len(mentions) > 1:
+            notes = f"Also mentioned in: {', '.join(mentions[1:])}"
+        entry = build_mapping_entry(
+            mapping_id=mapping_id,
+            doc=doc,
+            code=list(item.get("code") or []),
+            kind=kind,
+            notes=notes,
+        )
+        stanzas.append(
+            build_stanza_record(
+                "add",
+                target_file,
+                entry,
+                item.get("reason") or "code path not listed in any mapping",
+            )
+        )
+    return stanzas
+
+
+def build_update_stanzas(
+    mappings: list[dict],
+    docs_repo: Path,
+    product: str,
+    target_file: str,
+) -> list[dict[str, Any]]:
+    """Copy-paste stanzas to update existing doc: null rows when docs mention the code."""
+    mapped_docs: set[str] = set()
+    for m in mappings:
+        doc = m.get("doc")
+        if doc:
+            mapped_docs.add(normalize_rel(doc))
+
+    stanzas: list[dict[str, Any]] = []
+    for m in mappings:
+        if m.get("doc") is not None:
+            continue
+        needles = needles_for_code_patterns(list(m.get("code") or []))
+        hits = find_doc_mentions(docs_repo, needles, mapped_docs, product)
+        if not hits:
+            continue
+
+        kind = m.get("kind") or "feature"
+        audience = m.get("audience") or infer_audience(kind)
+        notes_parts: list[str] = []
+        if m.get("notes"):
+            notes_parts.append(str(m["notes"]))
+        notes_parts.append("Suggested doc link; was doc: null")
+        if len(hits) > 1:
+            notes_parts.append(f"Also mentioned in: {', '.join(hits[1:])}")
+
+        status: str | None = None
+        if len(hits) > 1 or m.get("status") == "partial":
+            status = "partial"
+
+        entry = build_mapping_entry(
+            mapping_id=m["id"],
+            doc=hits[0],
+            code=list(m.get("code") or []),
+            kind=kind,
+            audience=audience,
+            status=status,
+            notes="; ".join(notes_parts),
+        )
+        stanzas.append(
+            build_stanza_record(
+                "update",
+                target_file,
+                entry,
+                f"doc mention found for existing undocumented row {m['id']}",
+            )
+        )
+    return stanzas
+
+
+def build_mapping_stanzas(
+    all_mappings: list[dict],
+    mapping_suggestions: dict[str, Any],
+    docs_repo: Path,
+    product: str,
+    target_file: str,
+) -> dict[str, Any]:
+    """Assemble add/update stanza blocks for the audit report."""
+    existing_ids = {m["id"] for m in all_mappings if m.get("id")}
+    add = build_new_stanzas(
+        mapping_suggestions.get("unmapped_code") or [],
+        existing_ids,
+        target_file,
+    )
+    update = build_update_stanzas(all_mappings, docs_repo, product, target_file)
+    return {
+        "summary": {"add": len(add), "update": len(update)},
+        "add": add,
+        "update": update,
+    }
+
+
+def append_stanzas_markdown(
+    lines: list[str], block: dict, *, heading_level: int = 2
+) -> None:
+    """Append Suggested mapping stanzas section for one product."""
+    stanzas = block.get("mapping_stanzas") or {}
+    add = stanzas.get("add") or []
+    update = stanzas.get("update") or []
+    summary = stanzas.get("summary") or {}
+    product_key = block.get("product_key") or "vmware"
+    target_file = PRODUCT_MAP.get(product_key) or "code-to-docs.yaml"
+    h3 = "#" * (heading_level + 1)
+    h4 = "#" * (heading_level + 2)
+
+    lines.extend(
+        [
+            "",
+            f"{h3} Suggested mapping stanzas",
+            "",
+            f"Copy-paste into `config/{target_file}` under `mappings:` after review. "
+            "This run did not modify any mapping file.",
+            "",
+        ]
+    )
+
+    add_count = summary.get("add", len(add))
+    update_count = summary.get("update", len(update))
+    if not add and not update:
+        lines.extend(["_No add/update stanzas this run._", ""])
+        return
+
+    if add:
+        lines.extend([f"{h4} Add ({add_count})", "", "```yaml"])
+        lines.extend(item["yaml"] for item in add)
+        lines.extend(["```", ""])
+
+    if update:
+        lines.extend(
+            [
+                f"{h4} Update existing rows ({update_count})",
+                "",
+                "Replace the matching `id` block in the YAML:",
+                "",
+                "```yaml",
+            ]
+        )
+        lines.extend(item["yaml"] for item in update)
+        lines.extend(["```", ""])
+
+
 def pick_report_paths(reports_dir: Path, date_str: str) -> tuple[Path, Path]:
     base = f"audit-report-{date_str}"
     suffix = ""
@@ -505,6 +772,14 @@ def audit_product(
         product=product,
         docs_repo_url=docs_repo_url,
     )
+    target_file = PRODUCT_MAP[product]
+    mapping_stanzas = build_mapping_stanzas(
+        all_mappings,
+        mapping_suggestions,
+        docs_repo,
+        product,
+        target_file,
+    )
 
     return {
         "product": map_data.get("product") or code_key,
@@ -515,6 +790,7 @@ def audit_product(
         "summary": summary,
         "mappings": results,
         "mapping_suggestions": mapping_suggestions,
+        "mapping_stanzas": mapping_stanzas,
     }
 
 
@@ -639,6 +915,8 @@ def append_product_markdown(lines: list[str], block: dict, *, heading_level: int
                 "",
             ]
         )
+
+    append_stanzas_markdown(lines, block, heading_level=heading_level)
 
 
 def write_markdown(path: Path, report: dict, rel_json: str) -> None:
@@ -823,6 +1101,7 @@ def main() -> int:
         report["code_repo_path"] = b["code_repo_path"]
         report["mappings"] = b["mappings"]
         report["mapping_suggestions"] = b["mapping_suggestions"]
+        report["mapping_stanzas"] = b["mapping_stanzas"]
 
     json_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     write_markdown(md_path, report, rel_json)
@@ -843,6 +1122,11 @@ def main() -> int:
         print(
             f"SUGGESTIONS {b['product_key']} unmapped_code={sug.get('unmapped_code', 0)} "
             f"unmapped_docs={sug.get('unmapped_docs', 0)}"
+        )
+        stanza_summary = (b.get("mapping_stanzas") or {}).get("summary") or {}
+        print(
+            f"STANZAS {b['product_key']} add={stanza_summary.get('add', 0)} "
+            f"update={stanza_summary.get('update', 0)}"
         )
         for r in b["mappings"]:
             paths = "yes" if r["paths_ok"] else "no"
