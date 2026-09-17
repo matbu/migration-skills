@@ -1,7 +1,1061 @@
-#humanmade map of code to docs for os-migrate
-# to be added later
+# Human-maintained map: os-migrate code -> documentation repo
 product: os-migrate
-code_repo: https://github.com/os-migrate/os-migrate
-docs_repo: https://github.com/os-migrate/documentation
+code_repo: os-migrate
+docs_repo: documentation
 
-mappings: []
+mappings:
+  - id: osm-overview
+    doc: source/operator-overview.adoc
+    code:
+      - README.md
+      - galaxy.yml
+    audience: external
+    kind: feature
+    status: partial
+    notes: "Overview stub in documentation repo; fuller intro still on Sphinx site"
+
+  - id: osm-install-galaxy
+    doc: source/operator-install-from-galaxy.adoc
+    code:
+      - galaxy.yml
+      - requirements.yml
+    audience: external
+    kind: feature
+
+  - id: osm-install-source
+    doc: source/operator-install-from-source.adoc
+    code:
+      - Makefile
+      - requirements.txt
+      - requirements.yml
+    audience: external
+    kind: feature
+
+  - id: osm-upgrade
+    doc: source/operator-upgrade.adoc
+    code:
+      - galaxy.yml
+      - CHANGELOG.rst
+    audience: external
+    kind: feature
+
+  - id: osm-walkthrough
+    doc: source/operator-walkthrough.adoc
+    code:
+      - playbooks/**
+      - roles/**
+      - inventory/localhost.yml
+    audience: external
+    kind: feature
+    notes: "Main OS-to-OS operator guide; exists in documentation but not wired into index.adoc"
+
+  - id: osm-usage-notes
+    doc: source/operator-usage-notes.adoc
+    code:
+      - playbooks/**
+    audience: external
+    kind: feature
+
+  - id: osm-variables-guide
+    doc: source/operator-variables-guide.adoc
+    code:
+      - roles/**/defaults/**
+    audience: external
+    kind: feature
+    notes: "OSM roles use defaults/; no roles/**/vars/** tree"
+
+  - id: osm-migration-parameters
+    doc: source/operator-migration-parameters-guide.adoc
+    code:
+      - roles/export_workloads/**
+      - roles/import_workloads/**
+    audience: external
+    kind: feature
+
+  - id: osm-troubleshooting
+    doc: source/operator-troubleshooting.adoc
+    code:
+      - roles/import_workloads/**
+      - roles/conversion_host/**
+    audience: external
+    kind: feature
+
+  - id: osm-conversion-host-guide
+    doc: source/operator-conversion-host-guide.adoc
+    code:
+      - roles/conversion_host/**
+      - roles/conversion_host_content/**
+      - playbooks/deploy_conversion_hosts.yml
+      - playbooks/delete_conversion_hosts.yml
+    audience: external
+    kind: feature
+
+  - id: osm-migrator-host
+    doc: source/operator-migrator-host.adoc
+    code:
+      - requirements.yml
+      - galaxy.yml
+    audience: external
+    kind: feature
+    status: partial
+    notes: "Shared migrator-host guide; mostly OSM-flavored"
+
+  - id: osm-process-summary
+    doc: source/operator-process-summary.adoc
+    code:
+      - playbooks/**
+    audience: external
+    kind: feature
+    status: partial
+
+  - id: osm-glossary
+    doc: source/operator-glossary.adoc
+    code:
+      - README.md
+    audience: external
+    kind: feature
+    status: partial
+
+  - id: osm-how-it-works-workload
+    doc: null
+    code:
+      - roles/import_workloads/**
+      - plugins/modules/import_workload_*.py
+    audience: external
+    kind: feature
+    status: undocumented
+    notes: "Sphinx user/how-it-works-workload-migration.rst has no AsciiDoc counterpart yet"
+
+  - id: osm-nbd-source-migration
+    doc: null
+    code:
+      - plugins/modules/update_workload_nbdkit_uris.py
+      - roles/import_workloads/**
+    audience: external
+    kind: feature
+    status: undocumented
+    notes: "Sphinx user/nbd-source-migration.rst has no AsciiDoc counterpart yet"
+
+  - id: osm-changelog
+    doc: null
+    code:
+      - CHANGELOG.rst
+    audience: external
+    kind: feature
+    status: undocumented
+    notes: "No changelog.adoc in documentation repo"
+
+  # --- Roles (reference stubs are partial / ansibleautoplugin placeholders) ---
+
+  - id: osm-role-conversion_host
+    doc: source/reference-role-conversion_host.adoc
+    code:
+      - roles/conversion_host/**
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-conversion_host_content
+    doc: source/reference-role-conversion_host_content.adoc
+    code:
+      - roles/conversion_host_content/**
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_detached_volumes
+    doc: source/reference-role-export_detached_volumes.adoc
+    code:
+      - roles/export_detached_volumes/**
+      - playbooks/export_detached_volumes.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_flavors
+    doc: source/reference-role-export_flavors.adoc
+    code:
+      - roles/export_flavors/**
+      - playbooks/export_flavors.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_images
+    doc: source/reference-role-export_images.adoc
+    code:
+      - roles/export_images/**
+      - playbooks/export_images.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_keypairs
+    doc: source/reference-role-export_keypairs.adoc
+    code:
+      - roles/export_keypairs/**
+      - playbooks/export_keypairs.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_networks
+    doc: source/reference-role-export_networks.adoc
+    code:
+      - roles/export_networks/**
+      - playbooks/export_networks.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_projects
+    doc: source/reference-role-export_projects.adoc
+    code:
+      - roles/export_projects/**
+      - playbooks/export_projects.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_router_interfaces
+    doc: source/reference-role-export_router_interfaces.adoc
+    code:
+      - roles/export_router_interfaces/**
+      - playbooks/export_router_interfaces.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_routers
+    doc: source/reference-role-export_routers.adoc
+    code:
+      - roles/export_routers/**
+      - playbooks/export_routers.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_security_group_rules
+    doc: source/reference-role-export_security_group_rules.adoc
+    code:
+      - roles/export_security_group_rules/**
+      - playbooks/export_security_group_rules.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_security_groups
+    doc: source/reference-role-export_security_groups.adoc
+    code:
+      - roles/export_security_groups/**
+      - playbooks/export_security_groups.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_subnets
+    doc: source/reference-role-export_subnets.adoc
+    code:
+      - roles/export_subnets/**
+      - playbooks/export_subnets.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_user_project_role_assignments
+    doc: source/reference-role-export_user_project_role_assignment.adoc
+    code:
+      - roles/export_user_project_role_assignments/**
+      - playbooks/export_user_project_role_assignments.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build; Doc filename singular (reference-role-export_user_project_role_assignment.adoc) vs role plural (export_user_project_role_assignments)"
+
+  - id: osm-role-export_users
+    doc: source/reference-role-export_users.adoc
+    code:
+      - roles/export_users/**
+      - playbooks/export_users.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_users_keypairs
+    doc: source/reference-role-export_users_keypairs.adoc
+    code:
+      - roles/export_users_keypairs/**
+      - playbooks/export_users_keypairs.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-export_workloads
+    doc: source/reference-role-export_workloads.adoc
+    code:
+      - roles/export_workloads/**
+      - playbooks/export_workloads.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_detached_volumes
+    doc: source/reference-role-import_detached_volumes.adoc
+    code:
+      - roles/import_detached_volumes/**
+      - playbooks/import_detached_volumes.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_flavors
+    doc: source/reference-role-import_flavors.adoc
+    code:
+      - roles/import_flavors/**
+      - playbooks/import_flavors.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_from_hypervisor
+    doc: null
+    code:
+      - roles/import_from_hypervisor/**
+      - playbooks/import_from_hypervisor.yml
+    audience: external
+    kind: role
+    status: undocumented
+    notes: "No source/reference-role-*.adoc for import_from_hypervisor"
+
+  - id: osm-role-import_images
+    doc: source/reference-role-import_images.adoc
+    code:
+      - roles/import_images/**
+      - playbooks/import_images.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_keypairs
+    doc: source/reference-role-import_keypairs.adoc
+    code:
+      - roles/import_keypairs/**
+      - playbooks/import_keypairs.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_networks
+    doc: source/reference-role-import_networks.adoc
+    code:
+      - roles/import_networks/**
+      - playbooks/import_networks.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_projects
+    doc: source/reference-role-import_projects.adoc
+    code:
+      - roles/import_projects/**
+      - playbooks/import_projects.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_router_interfaces
+    doc: source/reference-role-import_router_interfaces.adoc
+    code:
+      - roles/import_router_interfaces/**
+      - playbooks/import_router_interfaces.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_routers
+    doc: source/reference-role-import_routers.adoc
+    code:
+      - roles/import_routers/**
+      - playbooks/import_routers.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_security_group_rules
+    doc: source/reference-role-import_security_group_rules.adoc
+    code:
+      - roles/import_security_group_rules/**
+      - playbooks/import_security_group_rules.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_security_groups
+    doc: source/reference-role-import_security_groups.adoc
+    code:
+      - roles/import_security_groups/**
+      - playbooks/import_security_groups.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_subnets
+    doc: source/reference-role-import_subnets.adoc
+    code:
+      - roles/import_subnets/**
+      - playbooks/import_subnets.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_user_project_role_assignments
+    doc: source/reference-role-import_user_project_role_assignment.adoc
+    code:
+      - roles/import_user_project_role_assignments/**
+      - playbooks/import_user_project_role_assignments.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build; Doc filename singular (reference-role-import_user_project_role_assignment.adoc) vs role plural (import_user_project_role_assignments)"
+
+  - id: osm-role-import_users
+    doc: source/reference-role-import_users.adoc
+    code:
+      - roles/import_users/**
+      - playbooks/import_users.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_users_keypairs
+    doc: source/reference-role-import_users_keypairs.adoc
+    code:
+      - roles/import_users_keypairs/**
+      - playbooks/import_users_keypairs.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-import_workloads
+    doc: source/reference-role-import_workloads.adoc
+    code:
+      - roles/import_workloads/**
+      - playbooks/import_workloads.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-prelude_common
+    doc: source/reference-role-prelude_common.adoc
+    code:
+      - roles/prelude_common/**
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-prelude_dst
+    doc: source/reference-role-prelude_dst.adoc
+    code:
+      - roles/prelude_dst/**
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-prelude_src
+    doc: source/reference-role-prelude_src.adoc
+    code:
+      - roles/prelude_src/**
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-validate_data_dir
+    doc: source/reference-role-validate_data_dir.adoc
+    code:
+      - roles/validate_data_dir/**
+      - playbooks/validate_data_dir.yml
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-role-validate_resource_files
+    doc: source/reference-role-validate_resource_files.adoc
+    code:
+      - roles/validate_resource_files/**
+    audience: external
+    kind: role
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-playbook-deploy-conversion-hosts
+    doc: source/operator-conversion-host-guide.adoc
+    code:
+      - playbooks/deploy_conversion_hosts.yml
+    audience: external
+    kind: playbook
+
+  - id: osm-playbook-delete-conversion-hosts
+    doc: source/operator-conversion-host-guide.adoc
+    code:
+      - playbooks/delete_conversion_hosts.yml
+    audience: external
+    kind: playbook
+
+  # --- Modules (reference stubs are partial / ansibleautoplugin placeholders) ---
+
+  - id: osm-module-auth_info
+    doc: source/reference-module-auth_info.adoc
+    code:
+      - plugins/modules/auth_info.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_detached_volume
+    doc: source/reference-module-export_detached_volume.adoc
+    code:
+      - plugins/modules/export_detached_volume.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_flavor
+    doc: source/reference-module-export_flavor.adoc
+    code:
+      - plugins/modules/export_flavor.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_image_blob
+    doc: source/reference-module-export_image_blob.adoc
+    code:
+      - plugins/modules/export_image_blob.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_image_meta
+    doc: source/reference-module-export_image_meta.adoc
+    code:
+      - plugins/modules/export_image_meta.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_keypair
+    doc: source/reference-module-export_keypair.adoc
+    code:
+      - plugins/modules/export_keypair.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_network
+    doc: source/reference-module-export_network.adoc
+    code:
+      - plugins/modules/export_network.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_project
+    doc: source/reference-module-export_project.adoc
+    code:
+      - plugins/modules/export_project.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_router
+    doc: source/reference-module-export_router.adoc
+    code:
+      - plugins/modules/export_router.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_router_interfaces
+    doc: source/reference-module-export_router_interfaces.adoc
+    code:
+      - plugins/modules/export_router_interfaces.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_security_group
+    doc: source/reference-module-export_security_group.adoc
+    code:
+      - plugins/modules/export_security_group.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_security_group_rules
+    doc: source/reference-module-export_security_group_rules.adoc
+    code:
+      - plugins/modules/export_security_group_rules.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_subnet
+    doc: source/reference-module-export_subnet.adoc
+    code:
+      - plugins/modules/export_subnet.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_user
+    doc: source/reference-module-export_user.adoc
+    code:
+      - plugins/modules/export_user.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_user_project_role_assignment
+    doc: source/reference-module-export_user_project_role_assignment.adoc
+    code:
+      - plugins/modules/export_user_project_role_assignment.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-export_workload
+    doc: source/reference-module-export_workload.adoc
+    code:
+      - plugins/modules/export_workload.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_flavor
+    doc: source/reference-module-import_flavor.adoc
+    code:
+      - plugins/modules/import_flavor.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_image
+    doc: source/reference-module-import_image.adoc
+    code:
+      - plugins/modules/import_image.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_keypair
+    doc: source/reference-module-import_keypair.adoc
+    code:
+      - plugins/modules/import_keypair.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_network
+    doc: source/reference-module-import_network.adoc
+    code:
+      - plugins/modules/import_network.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_project
+    doc: source/reference-module-import_project.adoc
+    code:
+      - plugins/modules/import_project.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_router
+    doc: source/reference-module-import_router.adoc
+    code:
+      - plugins/modules/import_router.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_router_interface
+    doc: source/reference-module-import_router_interface.adoc
+    code:
+      - plugins/modules/import_router_interface.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_security_group
+    doc: source/reference-module-import_security_group.adoc
+    code:
+      - plugins/modules/import_security_group.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_security_group_rule
+    doc: source/reference-module-import_security_group_rule.adoc
+    code:
+      - plugins/modules/import_security_group_rule.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_subnet
+    doc: source/reference-module-import_subnet.adoc
+    code:
+      - plugins/modules/import_subnet.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_user
+    doc: source/reference-module-import_user.adoc
+    code:
+      - plugins/modules/import_user.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_user_project_role_assignment
+    doc: source/reference-module-import_user_project_role_assignment.adoc
+    code:
+      - plugins/modules/import_user_project_role_assignment.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_volumes_export
+    doc: source/reference-module-import_volumes_export.adoc
+    code:
+      - plugins/modules/import_volumes_export.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_volumes_src_cleanup
+    doc: source/reference-module-import_volumes_src_cleanup.adoc
+    code:
+      - plugins/modules/import_volumes_src_cleanup.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_volumes_transfer
+    doc: source/reference-module-import_volumes_transfer.adoc
+    code:
+      - plugins/modules/import_volumes_transfer.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_workload_create_instance
+    doc: source/reference-module-import_workload_create_instance.adoc
+    code:
+      - plugins/modules/import_workload_create_instance.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_workload_dst_check
+    doc: source/reference-module-import_workload_dst_check.adoc
+    code:
+      - plugins/modules/import_workload_dst_check.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_workload_dst_failure_cleanup
+    doc: source/reference-module-import_workload_dst_failure_cleanup.adoc
+    code:
+      - plugins/modules/import_workload_dst_failure_cleanup.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_workload_export_volume_map
+    doc: null
+    code:
+      - plugins/modules/import_workload_export_volume_map.py
+    audience: external
+    kind: module
+    status: undocumented
+    notes: "No source/reference-module-import_workload_export_volume_map.adoc"
+
+  - id: osm-module-import_workload_export_volumes
+    doc: source/reference-module-import_workload_export_volumes.adoc
+    code:
+      - plugins/modules/import_workload_export_volumes.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_workload_prelim
+    doc: source/reference-module-import_workload_prelim.adoc
+    code:
+      - plugins/modules/import_workload_prelim.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_workload_src_check
+    doc: source/reference-module-import_workload_src_check.adoc
+    code:
+      - plugins/modules/import_workload_src_check.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_workload_src_cleanup
+    doc: source/reference-module-import_workload_src_cleanup.adoc
+    code:
+      - plugins/modules/import_workload_src_cleanup.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-import_workload_transfer_volumes
+    doc: source/reference-module-import_workload_transfer_volumes.adoc
+    code:
+      - plugins/modules/import_workload_transfer_volumes.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-os_conversion_host_info
+    doc: source/reference-module-os_conversion_host_info.adoc
+    code:
+      - plugins/modules/os_conversion_host_info.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-os_keypairs_info
+    doc: source/reference-module-os_keypairs_info.adoc
+    code:
+      - plugins/modules/os_keypairs_info.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-os_role_assignments_info
+    doc: source/reference-module-os_role_assignments_info.adoc
+    code:
+      - plugins/modules/os_role_assignments_info.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-os_routers_info
+    doc: source/reference-module-os_routers_info.adoc
+    code:
+      - plugins/modules/os_routers_info.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-os_security_groups_info
+    doc: source/reference-module-os_security_groups_info.adoc
+    code:
+      - plugins/modules/os_security_groups_info.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-read_resources
+    doc: source/reference-module-read_resources.adoc
+    code:
+      - plugins/modules/read_resources.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-module-update_workload_nbdkit_uris
+    doc: null
+    code:
+      - plugins/modules/update_workload_nbdkit_uris.py
+    audience: external
+    kind: module
+    status: undocumented
+    notes: "No source/reference-module-update_workload_nbdkit_uris.adoc"
+
+  - id: osm-module-validate_resource_files
+    doc: source/reference-module-validate_resource_files.adoc
+    code:
+      - plugins/modules/validate_resource_files.py
+    audience: external
+    kind: module
+    status: partial
+    notes: "Reference stub only; not expanded by AsciiDoctor build"
+
+  - id: osm-modules-index
+    doc: source/modules-index.adoc
+    code:
+      - plugins/modules/**
+    audience: external
+    kind: feature
+    status: partial
+    notes: "Index includes wrong filenames (module-*.adoc vs reference-module-*.adoc); stubs only"
+
+  - id: osm-developer-design
+    doc: source/developer-design.adoc
+    code:
+      - plugins/**
+      - roles/**
+    audience: internal
+    kind: feature
+
+  - id: osm-developer-dev-env
+    doc: source/developer-dev-env-setup.adoc
+    code:
+      - Makefile
+      - scripts/**
+      - requirements-tests.txt
+      - requirements-docs.txt
+    audience: internal
+    kind: feature
+    status: partial
+    notes: "AsciiDoc shorter than Sphinx devel/dev-env-setup.rst"
+
+  - id: osm-developer-vagrant
+    doc: source/developer-dev-env-vagrant-non-containerized.adoc
+    code:
+      - Makefile
+    audience: internal
+    kind: feature
+    status: partial
+
+  - id: osm-developer-contributing-general
+    doc: source/developer-contributing-general.adoc
+    code:
+      - README.md
+      - CODEOWNERS
+    audience: internal
+    kind: feature
+
+  - id: osm-developer-contributing-code
+    doc: source/developer-contributing-code.adoc
+    code:
+      - roles/**
+      - plugins/modules/**
+      - tests/**
+    audience: internal
+    kind: feature
+
+  - id: osm-developer-contributing-docs
+    doc: source/developer-contributing-docs.adoc
+    code:
+      - docs/**
+    audience: internal
+    kind: feature
+    status: partial
+    notes: "Still describes in-tree Sphinx docs/src; documentation repo is the shared target"
+
+  - id: osm-developer-releasing
+    doc: source/developer-releasing.adoc
+    code:
+      - galaxy.yml
+      - CHANGELOG.rst
+      - scripts/publish.sh
+    audience: internal
+    kind: feature
+
+  - id: osm-aee
+    doc: source/developer-aee.adoc
+    code:
+      - aee/**
+      - .github/workflows/build-aee.yml
+    audience: internal
+    kind: feature
+    status: partial
+    notes: "Shared AEE developer guide; also used by VMK"
+
+  - id: osm-ci
+    doc: source/developer-github-actions.adoc
+    code:
+      - .github/workflows/**
+    audience: internal
+    kind: ci
+    status: partial
+    notes: "Shared GHA guide; primarily written for VMK but lists CI patterns"

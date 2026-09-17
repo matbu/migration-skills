@@ -1,7 +1,7 @@
 ---
 name: audit-docs-correctness
-description: Compare documented VMK code against documentation content; suggest fixes only (read-only)
-tags: [docs, audit, vmware-migration-kit, correctness]
+description: Compare documented code against documentation for VMware Migration Kit and os-migrate; suggest fixes only (read-only)
+tags: [docs, audit, vmware-migration-kit, os-migrate, correctness]
 ---
 
 # Audit docs correctness
@@ -15,16 +15,22 @@ Shared config lives in `../audit-docs/config/`. Paths below are relative to this
 ## Usage
 
 ```
+/audit-docs-correctness
+/audit-docs-correctness all
 /audit-docs-correctness vmware
-/audit-docs-correctness vmware ../audit-docs/reports/audit-report-2026-07-01.json
+/audit-docs-correctness os-migrate
+/audit-docs-correctness ../audit-docs/reports/audit-report-2026-07-01.json
 /audit-docs-correctness vmware vmk-migrate-nbdkit
-/audit-docs-correctness vmware ../audit-docs/reports/audit-report-2026-07-01.json vmk-migrate-nbdkit
+/audit-docs-correctness os-migrate ../audit-docs/reports/audit-report-2026-07-01.json osm-walkthrough
 ```
 
 **Arguments:**
-- `vmware` (required) — use `../audit-docs/config/code-to-docs.vmware.yaml`
+- `product` (optional, default `all`) — `all` | `vmware` | `os-migrate` (aliases: `vmk`, `osm`)
+  - **`all`** (default): check **vmware-migration-kit first**, then **os-migrate**, in one report
 - `report.json` (optional) — audit report from skill 1; only check rows with `paths_ok: true` and `status: mapped`
-- `id` (optional) — single mapping id (e.g. `vmk-migrate-nbdkit`)
+  - Combined reports: use each entry under `products[]`
+  - Single-product reports: use top-level `mappings` or the one `products[]` entry
+- `id` (optional) — single mapping id (e.g. `vmk-migrate-nbdkit`, `osm-walkthrough`)
 
 ## Prerequisites
 
@@ -42,25 +48,32 @@ Include a mapping only if **all** are true:
 
 Skip rows with `doc: null`. If a report is provided, skip rows where `paths_ok` is false.
 
+When `product` is `all`, process products in this order:
+
+1. `vmware-migration-kit` (`code-to-docs.vmware.yaml`)
+2. `os-migrate` (`code-to-docs.os-migrate.yaml`)
+
 ## Steps
 
 ### 1. Load inputs
 
 1. Read `../audit-docs/config/repos.yaml` and resolve paths (expand `~`):
-   - Code: `code_repos.vmware-migration-kit.local_path`
-   - Docs: `docs_repo.local_path`
-   - Docs URL: `docs_repo.url` (for report links; default branch `main`)
-2. Read `../audit-docs/config/code-to-docs.vmware.yaml`
-3. If `report.json` given, read it and filter eligible rows; else use all mapped rows from the YAML
+   - Docs: `docs_repo.local_path` / `docs_repo.url`
+   - For each product in scope:
+     - Code: `code_repos.<key>.local_path` / `.url`
+       - VMware: `vmware-migration-kit`
+       - os-migrate: `os-migrate`
+2. Read the matching `../audit-docs/config/code-to-docs.*.yaml` file(s)
+3. If `report.json` given, read it and filter eligible rows per product; else use all mapped rows from each YAML
 
 ### 2. Compare doc vs code (by `kind`)
 
 For each eligible mapping, read the mapped doc file and related code. Use `notes` on the mapping for section focus when present.
 
 **playbook**
-- Collection FQCN in doc matches `galaxy.yml` (`namespace`, `name`)
-- Playbook referenced in doc (e.g. `os_migrate.vmware_migration_kit.migration`) matches a file under `playbooks/`
-- Sub-playbooks imported by `playbooks/migration.yml` still exist if doc describes end-to-end flow
+- Collection FQCN in doc matches `galaxy.yml` (`namespace`, `name`) for that product
+- Playbook referenced in doc matches a file under `playbooks/`
+- Sub-playbooks imported by the main playbook still exist if doc describes end-to-end flow
 
 **role / feature**
 - Variable names in doc examples exist in related role `defaults/main.yml`, playbooks, or role `README.md`
@@ -85,28 +98,42 @@ For each eligible mapping, read the mapped doc file and related code. Use `notes
 
 Record **evidence** for every warning/issue: file path, **line number**, and quote from doc and code.
 
-Always include the doc line number in findings (e.g. `operator-vmware-guide.adoc line 331`).
+Always include the doc line number in findings (e.g. `operator-vmware-guide.adoc line 331`) and the code line number when citing code (e.g. `roles/conversion_host/defaults/main.yml line 18`). Those line numbers feed the `doc` and `code` report links.
 
 ### 3b. Doc link (per row)
 
-Build a GitHub source link for the markdown `doc` column:
+Build a GitHub source link for the markdown **Doc** line:
 
 ```
 {docs_repo.url}/blob/main/{doc_path}#L{line}
 ```
 
-| Row | `doc_line` | Markdown `doc` column |
-|-----|------------|------------------------|
+| Row | `doc_line` | Markdown Doc link |
+|-----|------------|-------------------|
 | **issues** / **warnings** | First line cited in findings | `[basename:331](url#L331)` |
 | **ok** | Omit | `[basename](url)` (file only, no `#L`) |
 
-Example:
+### 3c. Code link (per row)
 
-```markdown
-[operator-vmware-guide.adoc:331](https://github.com/os-migrate/documentation/blob/main/source/operator-vmware-guide.adoc#L331)
+Build a GitHub source link for the markdown **Code** line from that product’s `code_repos.*.url`:
+
+```
+{code_repo.url}/blob/main/{code_path}#L{line}   # single file
+{code_repo.url}/tree/main/{dir_path}            # directory / glob base (e.g. roles/foo/**)
 ```
 
-When a row has multiple doc lines, link to the **first** issue line; list the rest in `findings` only.
+| Row | `code_line` | Markdown Code link |
+|-----|-------------|--------------------|
+| **issues** / **warnings** | First code line cited in findings | `[basename:42](url#L42)` |
+| **ok** | Omit | `[basename](url)` or `[dir/](tree-url)` (no `#L`) |
+
+Pick the path to link:
+
+1. Prefer the **first code file cited** in findings (with line when available).
+2. Else the first concrete file under the mapping's `code:` list.
+3. For a glob only (e.g. `roles/conversion_host/**`), link the directory with `/tree/main/` (strip `/**`).
+
+When multiple code paths matter, link the primary one on the **Code** line; mention the others in **Findings**.
 
 ### 4. Suggest fixes (text only)
 
@@ -127,36 +154,112 @@ Print markdown and save to:
 ../audit-docs/reports/correctness-report-{YYYY-MM-DD}.json
 ```
 
-**Markdown table** — `doc` column must be a markdown link (not a bare path):
+**Combined (`all`) markdown** — use headers and prose (not tables), product sections in order. List rows with **issues** first, then **warnings**, then **ok**.
 
-| id | correctness | doc | findings | suggested_fix |
-|----|-------------|-----|----------|---------------|
-| vmk-conversion-host | issues | [operator-vmware-guide.adoc:331](https://github.com/os-migrate/documentation/blob/main/source/operator-vmware-guide.adoc#L331) | Doc var `conversion_host_vmware_vix_disklib` not in code | Rename to `conversion_host_vmware_lib_dir` in VDDK example |
-| vmk-overview | ok | [operator-vmware-guide.adoc](https://github.com/os-migrate/documentation/blob/main/source/operator-vmware-guide.adoc) | FQCN matches galaxy.yml | |
+```markdown
+# Correctness report (YYYY-MM-DD)
 
-**JSON shape (per row):**
+Source: combined (vmware-migration-kit, then os-migrate)
+Overall: **ok=…**, **warnings=…**, **issues=…**
+
+This run did not modify any repository.
+
+## vmware-migration-kit
+
+Checked: N mapped rows …
+Summary: **ok=…**, **warnings=…**, **issues=…**
+
+### Results
+
+#### {id}: {correctness}
+
+Doc: [basename:331](doc_url)
+Code: [basename:42](code_url)
+
+Findings: …
+(or bullet list when multiple findings)
+
+Suggested fix: …
+(omit Suggested fix when correctness is ok)
+
+#### {next-id}: {correctness}
+…
+
+### Issues (priority)
+…
+### Warnings
+…
+
+## os-migrate
+
+Checked: …
+### Results
+#### {id}: {correctness}
+…
+```
+
+**Single-product markdown** — same header/prose shape:
+
+```markdown
+# Correctness report — {product} (YYYY-MM-DD)
+…
+## Results
+
+#### {id}: {correctness}
+
+Doc: …
+Code: …
+
+Findings: …
+
+Suggested fix: …
+```
+
+**JSON shape:**
 
 ```json
 {
-  "id": "vmk-conversion-host",
-  "correctness": "ok|warnings|issues",
-  "doc": "source/operator-vmware-guide.adoc",
-  "doc_line": 331,
-  "doc_url": "https://github.com/os-migrate/documentation/blob/main/source/operator-vmware-guide.adoc#L331",
-  "findings": ["..."],
-  "suggested_fix": "..."
+  "generated_at": "2026-07-01T14:00:00Z",
+  "summary": { "checked": 0, "ok": 0, "warnings": 0, "issues": 0 },
+  "products": [
+    {
+      "product": "vmware-migration-kit",
+      "product_key": "vmware",
+      "summary": { "checked": 17, "ok": 3, "warnings": 4, "issues": 10 },
+      "rows": [
+        {
+          "id": "vmk-conversion-host",
+          "correctness": "ok|warnings|issues",
+          "doc": "source/operator-vmware-guide.adoc",
+          "doc_line": 331,
+          "doc_url": "https://github.com/os-migrate/documentation/blob/main/source/operator-vmware-guide.adoc#L331",
+          "code": "roles/conversion_host/defaults/main.yml",
+          "code_line": 18,
+          "code_url": "https://github.com/os-migrate/vmware-migration-kit/blob/main/roles/conversion_host/defaults/main.yml#L18",
+          "findings": ["..."],
+          "suggested_fix": "..."
+        }
+      ]
+    },
+    {
+      "product": "os-migrate",
+      "product_key": "os-migrate",
+      "summary": { "checked": 0, "ok": 0, "warnings": 0, "issues": 0 },
+      "rows": []
+    }
+  ]
 }
 ```
 
-- `doc_line`: first cited line for issues/warnings; omit for `ok`
-- `doc_url`: full GitHub URL; include `#L{line}` when `doc_line` is set
-
-Omit or empty `suggested_fix` when `correctness` is `ok`.
+- `products` is always **vmware first**, then **os-migrate** when both are in scope
+- For a single-product run, `products` has one entry; top-level `rows` may also be set for convenience
+- `doc_line` / `code_line`: first cited line for issues/warnings; omit for `ok`
+- Omit or empty `suggested_fix` when `correctness` is `ok`
 
 ### 6. Summarize
 
-- Total checked, ok / warnings / issues counts
-- List ids with **issues** first, then **warnings**
+- Overall ok / warnings / issues, then per product
+- List ids with **issues** first, then **warnings** (within each product, VMware section before os-migrate)
 - Remind: this run did not modify any repository
 
 ## Rules
@@ -176,8 +279,37 @@ Omit or empty `suggested_fix` when `correctness` is `ok`.
 
 You are responsible for executing the steps above when the user invokes `/audit-docs-correctness`.
 
-Use `rg`, `grep`, and file reads to compare names and examples. Prefer narrow context: only files listed in the mapping's `code:` and the single `doc:` file.
+## Autonomous execution
 
-When the same doc file appears in multiple mappings, check only what is relevant to that mapping's code paths and `notes`.
+- Run the bundled script immediately. **Do not ask the user questions** or wait for confirmation.
+- **Do not** paste scripts for the user to run — execute the command yourself.
+- **Do not** re-implement the mechanical audit by reading every mapped file in chat — the script does that.
+- If the script fails, show stderr and stop.
 
-Build `doc_url` from `docs_repo.url` in `repos.yaml` — do not hardcode a different org or branch unless the user specifies one.
+From the skill directory (`skills/audit-docs-correctness/`), run:
+
+```bash
+./scripts/audit-correctness.sh
+./scripts/audit-correctness.sh all
+./scripts/audit-correctness.sh vmware
+./scripts/audit-correctness.sh os-migrate
+./scripts/audit-correctness.sh vmware vmk-migrate-nbdkit
+./scripts/audit-correctness.sh ../audit-docs/reports/audit-report-YYYY-MM-DD.json
+./scripts/audit-correctness.sh os-migrate ../audit-docs/reports/audit-report-YYYY-MM-DD.json osm-walkthrough
+```
+
+The script reads `../audit-docs/config/repos.yaml` and the matching `code-to-docs*.yaml` files, runs **mechanical** checks by `kind` (variable/option/FQCN/path presence), and writes reports under `../audit-docs/reports/correctness-report-*.{json,md}`.
+
+On success, print the script output (`SUMMARY` / `CORRECTNESS_JSON=` / `CORRECTNESS_MD=` lines) and a short chat summary (issues first, then warnings). Do not modify repos or apply suggested fixes.
+
+### What the script covers vs agent follow-up
+
+| Covered by script | Optional agent follow-up (only if user asks) |
+|-------------------|-----------------------------------------------|
+| Doc var names scoped to mapped roles with no code match | Prose / version / value drift beyond names |
+| Role defaults missing from doc (warnings) | Whether a warning is intentional |
+| Module `DOCUMENTATION` options vs doc (skips `ansibleautoplugin` stubs) | Full narrative accuracy |
+| Playbook FQCN + `import_playbook` targets | End-to-end flow judgment |
+| CI workflow filenames mentioned in doc | Trigger/`on:` block deep compare |
+
+Default to **both products** (VMware kit, then os-migrate) unless the user names a single product.
