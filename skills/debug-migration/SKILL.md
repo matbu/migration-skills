@@ -1,3 +1,9 @@
+---
+name: diagnose-migration
+description: Diagnose VMware Migration Failures
+tags: [debug, migration, vmware, openstack, virt-v2v]
+---
+
 # Debug VMware Migration Failures
 
 Analyze migration failures from VMware to OpenStack by pulling logs from the conversion host and using multi-agent AI analysis to identify root causes and suggest solutions.
