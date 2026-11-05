@@ -51,6 +51,7 @@ This skill automates the release process for os-migrate by:
    - `aee/execution-environment.yml`: tarball reference
    - `aee/requirements.yml`: collection source path
    - `docs/src/user/walkthrough.rst`: version example
+   - `tests/func/tasks/tenant/data/validate_data_dir/*/networks*.yml` (3 fixtures): `os_migrate_version` line
 5. **Create git commit** (optional): "Bump release to vX.Y.Z" or "Bump minor release to X.Y.Z"
 
 ## Files Modified
@@ -61,6 +62,9 @@ This skill automates the release process for os-migrate by:
 - `aee/execution-environment.yml`
 - `aee/requirements.yml`
 - `docs/src/user/walkthrough.rst`
+- `tests/func/tasks/tenant/data/validate_data_dir/valid/networks.yml`
+- `tests/func/tasks/tenant/data/validate_data_dir/invalid/networks.yml`
+- `tests/func/tasks/tenant/data/validate_data_dir/invalid/networks-duplicate.yml`
 
 ## Prerequisites
 
@@ -129,14 +133,25 @@ You are responsible for:
    os_migrate_version: 1.0.4  # old: 1.0.3
    ```
 
-10. **Creating a git commit** (ask user first):
+10. **Updating the func test fixtures** (line 1 of each):
+    `tests/func/tasks/tenant/data/validate_data_dir/valid/networks.yml`,
+    `.../invalid/networks.yml`, `.../invalid/networks-duplicate.yml`:
+    ```yaml
+    os_migrate_version: 1.0.4  # old: 1.0.3
+    ```
+    `plugins/module_utils/filesystem.py` requires an exact match with
+    `OS_MIGRATE_VERSION`; forgetting these breaks the gostack functional tests CI.
+    Afterwards, `git grep -n "<old version>" -- ':!CHANGELOG.rst'` must return nothing
+    (except intentionally old examples in walkthrough.rst like `0.17.0`).
+
+11. **Creating a git commit** (ask user first):
     ```bash
-    git add galaxy.yml plugins/module_utils/const.py CHANGELOG.rst aee/execution-environment.yml aee/requirements.yml docs/src/user/walkthrough.rst
+    git add galaxy.yml plugins/module_utils/const.py CHANGELOG.rst aee/execution-environment.yml aee/requirements.yml docs/src/user/walkthrough.rst tests/func/tasks/tenant/data/validate_data_dir
     git commit -m "Bump minor release to 1.0.4"
     ```
     Note: Use "Bump minor release to X.Y.Z" for patch updates, "Bump major release to X.Y.Z" for minor/major updates.
 
-11. **Show summary** of what was changed and next steps (e.g., "Push and create PR")
+12. **Show summary** of what was changed and next steps (e.g., "Push and create PR")
 
 ## Important Notes
 
@@ -145,7 +160,7 @@ You are responsible for:
 - **Check for unreleased changes**: If no commits since last tag and no changelog provided, warn the user
 - **Don't create git tag**: The tag should be created manually or by CI after PR merge
 - **Verify current branch**: Warn if on `main` branch (should create feature branch first)
-- **All 6 files must be updated**: galaxy.yml, const.py, CHANGELOG.rst, execution-environment.yml, requirements.yml, walkthrough.rst
+- **All 9 files must be updated**: galaxy.yml, const.py, CHANGELOG.rst, execution-environment.yml, requirements.yml, walkthrough.rst, and the 3 validate_data_dir fixtures
 
 ## Error Handling
 
@@ -153,4 +168,4 @@ You are responsible for:
 - If no changelog entries provided/found: prompt user
 - If uncommitted changes exist: warn user
 - If version format invalid: error with example
-- If any of the 6 files are missing: error and list missing files
+- If any of the 9 files are missing: error and list missing files
