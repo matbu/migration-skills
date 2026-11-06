@@ -55,6 +55,9 @@ This makes skills **portable** and **self-contained** - all dependencies travel 
 
 # Force remote build
 /vmw-build-prod v2.2.4 192.168.1.100 builder
+
+# Build and publish to Ansible Galaxy (only if all post-build checks pass)
+/vmw-build-prod 2.2.4 192.168.1.100 builder --publish --api-key YOUR_KEY
 ```
 
 ### Direct Script Execution
@@ -80,6 +83,24 @@ All arguments are optional and positional:
 | 1 | `version` | latest tag | Git tag/branch to build |
 | 2 | `build-ip` | local | Remote build machine IP (forces remote build) |
 | 3 | `ssh-user` | `$USER` | SSH username for remote build |
+
+Optional flags (any position):
+
+| Flag | Description |
+|------|-------------|
+| `--publish` | Publish to Ansible Galaxy after all post-build checks pass |
+| `--api-key KEY` | Galaxy API key (required with `--publish`; or set `GALAXY_API_KEY`) |
+
+## Post-build Checks & Publishing
+
+After every build, the local tarball is checked:
+
+1. Non-empty, valid gzip archive
+2. Packaged `plugins/modules/migrate` is an ELF 64-bit x86-64 binary
+3. Collection version matches the requested tag (error with `--publish`, warning otherwise)
+4. With `--publish`: the version is not already published on Galaxy
+
+With `--publish`, the script first checks that an API key is given and `ansible-galaxy` is installed locally, so it fails before spending time on a build. It publishes only when every check is green. If the upload fails, the local tarball stays in `~/Downloads/`. The API key is never printed.
 
 ## Architecture Behavior
 
@@ -141,6 +162,12 @@ The built collection tarball is placed in `~/Downloads/`:
 - Local build: ensure Podman/Docker is running
 - Remote build: ensure remote has all dependencies
 - Check the error output for specific issues
+
+### "already published on Galaxy"
+- Galaxy versions are immutable; bump the version in `galaxy.yml` and tag a new release
+
+### "collection version ... does not match tag"
+- `galaxy.yml` version was not bumped for the tag; fix the release before publishing
 
 ### "Binary verification FAILED"
 - This means the built binary is not x86_64

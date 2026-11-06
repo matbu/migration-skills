@@ -14,10 +14,50 @@ NC='\033[0m' # No Color
 # Repository configuration
 REPO_URL="https://github.com/os-migrate/vmware-migration-kit.git"
 
-# Parse arguments
-VERSION="${1:-latest}"
-BUILD_IP="${2:-}"
-SSH_USER="${3:-${USER}}"
+# Galaxy configuration
+GALAXY_NAMESPACE="os_migrate"
+GALAXY_COLLECTION="vmware_migration_kit"
+GALAXY_API_URL="https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/index"
+
+# Parse arguments: positional [version] [build-ip] [ssh-user] plus
+# optional flags --publish and --api-key KEY (or GALAXY_API_KEY env var)
+PUBLISH=false
+API_KEY="${GALAXY_API_KEY:-}"
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --publish)
+            PUBLISH=true
+            shift
+            ;;
+        --api-key)
+            if [[ -z "${2:-}" ]]; then
+                echo "Error: --api-key requires a value" >&2
+                exit 1
+            fi
+            API_KEY="$2"
+            shift 2
+            ;;
+        --api-key=*)
+            API_KEY="${1#--api-key=}"
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [version] [build-ip] [ssh-user] [--publish --api-key KEY]"
+            exit 0
+            ;;
+        *)
+            POSITIONAL+=("$1")
+            shift
+            ;;
+    esac
+done
+VERSION="${POSITIONAL[0]:-latest}"
+BUILD_IP="${POSITIONAL[1]:-}"
+SSH_USER="${POSITIONAL[2]:-${USER}}"
+
+# Set by build_local / build_remote on success
+BUILT_TARBALL=""
 
 # Get current architecture
 CURRENT_ARCH=$(uname -m)
@@ -156,6 +196,7 @@ build_local() {
     print_info "Cleaning up build directory..."
     rm -rf "$build_dir"
 
+    BUILT_TARBALL="$dest"
     print_success "Build complete!"
     print_success "Output: $dest"
     return 0
@@ -257,9 +298,104 @@ build_remote() {
     print_info "Cleaning up remote build directory..."
     ssh "$remote_ssh" "rm -rf $remote_build_dir"
 
+    BUILT_TARBALL="$local_dest"
     print_success "Remote build complete!"
     print_success "Downloaded: $local_dest"
     return 0
+}
+
+# Fail fast before building if publishing was requested but cannot work
+check_publish_prereqs() {
+    if [[ -z "$API_KEY" ]]; then
+        print_error "--publish requires --api-key KEY (or GALAXY_API_KEY env var)"
+        exit 1
+    fi
+    if ! command -v ansible-galaxy > /dev/null 2>&1; then
+        print_error "ansible-galaxy not found locally (pip install 'ansible-core>=2.16.0')"
+        exit 1
+    fi
+    print_success "Publish prerequisites: ansible-galaxy found, API key provided"
+}
+
+# Post-build checks on the final local tarball. Returns non-zero if any fails.
+verify_tarball() {
+    local tarball=$1
+    local tag=$2
+    local failed=0
+    local tarball_name collection_version expected_version
+    tarball_name=$(basename "$tarball")
+    collection_version=${tarball_name#os_migrate-vmware_migration_kit-}
+    collection_version=${collection_version%.tar.gz}
+    expected_version=${tag#v}
+
+    print_info "Running post-build checks on $tarball_name..."
+
+    # 1. Tarball exists, is non-empty and a valid gzip archive
+    if [[ -s "$tarball" ]] && tar -tzf "$tarball" > /dev/null 2>&1; then
+        print_success "Check: tarball is a valid archive ($(du -h "$tarball" | cut -f1))"
+    else
+        print_error "Check: tarball missing, empty or corrupt"
+        return 1
+    fi
+
+    # 2. Tarball ships the migrate binary and it is x86-64
+    local tmp
+    tmp=$(mktemp -d)
+    if tar -xzf "$tarball" -C "$tmp" plugins/modules/migrate 2> /dev/null; then
+        local fout
+        fout=$(file "$tmp/plugins/modules/migrate")
+        if echo "$fout" | grep -q "ELF 64-bit" && echo "$fout" | grep -q "x86-64"; then
+            print_success "Check: packaged migrate binary is ELF x86-64"
+        else
+            print_error "Check: packaged migrate binary is NOT ELF x86-64: $fout"
+            failed=1
+        fi
+    else
+        print_error "Check: plugins/modules/migrate not found in tarball"
+        failed=1
+    fi
+    rm -rf "$tmp"
+
+    # 3. Collection version matches the requested tag
+    if [[ "$collection_version" == "$expected_version" ]]; then
+        print_success "Check: collection version $collection_version matches tag $tag"
+    elif [[ "$PUBLISH" == true ]]; then
+        print_error "Check: collection version $collection_version does not match tag $tag"
+        failed=1
+    else
+        print_warning "Check: collection version $collection_version differs from ref $tag"
+    fi
+
+    # 4. Version not already on Galaxy (only relevant when publishing)
+    if [[ "$PUBLISH" == true ]]; then
+        local code
+        code=$(curl -s -o /dev/null -w '%{http_code}' \
+            "$GALAXY_API_URL/$GALAXY_NAMESPACE/$GALAXY_COLLECTION/versions/$collection_version/" || true)
+        if [[ "$code" == "404" ]]; then
+            print_success "Check: version $collection_version not yet on Galaxy"
+        elif [[ "$code" == "200" ]]; then
+            print_error "Check: version $collection_version already published on Galaxy"
+            failed=1
+        else
+            print_warning "Check: could not query Galaxy (HTTP $code), continuing"
+        fi
+    fi
+
+    return $failed
+}
+
+publish_to_galaxy() {
+    local tarball=$1
+    print_info "Publishing $(basename "$tarball") to Ansible Galaxy..."
+    # Never echo the API key; mask it in any output just in case
+    # (pipefail is set, so a failing ansible-galaxy fails the pipeline)
+    if ansible-galaxy collection publish "$tarball" --api-key "$API_KEY" 2>&1 | \
+            sed "s/${API_KEY}/****/g"; then
+        print_success "Published: https://galaxy.ansible.com/ui/repo/published/$GALAXY_NAMESPACE/$GALAXY_COLLECTION/"
+        return 0
+    fi
+    print_error "Galaxy publish failed (local tarball kept: $tarball)"
+    return 1
 }
 
 # Main execution
@@ -280,6 +416,10 @@ main() {
         print_info "Latest version: $VERSION"
     fi
 
+    if [[ "$PUBLISH" == true ]]; then
+        check_publish_prereqs
+    fi
+
     # Display architecture
     print_info "Current architecture: $CURRENT_ARCH"
 
@@ -296,13 +436,27 @@ main() {
         # Not x86_64, need remote IP
         print_warning "Architecture is $CURRENT_ARCH (not x86_64)"
         print_error "Remote build machine IP required"
-        print_error "Usage: /vmw-build-prod [version] [build-ip] [ssh-user]"
+        print_error "Usage: /vmw-build-prod [version] [build-ip] [ssh-user] [--publish --api-key KEY]"
         print_error "Example: /vmw-build-prod v2.2.4 192.168.1.100 builder"
         exit 1
     fi
 
     echo ""
     print_success "Build process completed successfully!"
+
+    # Post-build checks (always run; gate publishing)
+    echo ""
+    if ! verify_tarball "$BUILT_TARBALL" "$VERSION"; then
+        print_error "Post-build checks FAILED"
+        [[ "$PUBLISH" == true ]] && print_error "Not publishing to Galaxy"
+        exit 1
+    fi
+    print_success "All post-build checks passed"
+
+    if [[ "$PUBLISH" == true ]]; then
+        echo ""
+        publish_to_galaxy "$BUILT_TARBALL" || exit 1
+    fi
 }
 
 # Run main function
