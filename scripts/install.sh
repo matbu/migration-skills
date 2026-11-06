@@ -94,7 +94,8 @@ install_skills() {
     if [ -d "$REPO_ROOT/skills" ]; then
         for skill_dir in "$REPO_ROOT/skills"/*; do
             if [ -d "$skill_dir" ]; then
-                local skill_name=$(basename "$skill_dir")
+                local skill_name
+                skill_name=$(basename "$skill_dir")
                 local target_dir="$SKILLS_DIR/$skill_name"
 
                 # Check if skill already exists
@@ -130,7 +131,8 @@ install_agents() {
     if [ -d "$REPO_ROOT/agents" ]; then
         for agent_dir in "$REPO_ROOT/agents"/*; do
             if [ -d "$agent_dir" ]; then
-                local agent_name=$(basename "$agent_dir")
+                local agent_name
+                agent_name=$(basename "$agent_dir")
                 local target_dir="$AGENTS_DIR/$agent_name"
 
                 # Check if agent already exists
@@ -169,7 +171,8 @@ create_symlinks() {
         if [ -d "$REPO_ROOT/skills" ]; then
             for skill_dir in "$REPO_ROOT/skills"/*; do
                 if [ -d "$skill_dir" ]; then
-                    local skill_name=$(basename "$skill_dir")
+                    local skill_name
+                    skill_name=$(basename "$skill_dir")
                     local target_dir="$SKILLS_DIR/$skill_name"
 
                     rm -rf "$target_dir"
@@ -183,7 +186,8 @@ create_symlinks() {
         if [ -d "$REPO_ROOT/agents" ]; then
             for agent_dir in "$REPO_ROOT/agents"/*; do
                 if [ -d "$agent_dir" ]; then
-                    local agent_name=$(basename "$agent_dir")
+                    local agent_name
+                    agent_name=$(basename "$agent_dir")
                     local target_dir="$AGENTS_DIR/$agent_name"
 
                     rm -rf "$target_dir"
@@ -241,7 +245,8 @@ uninstall() {
     if [ -d "$REPO_ROOT/skills" ]; then
         for skill_dir in "$REPO_ROOT/skills"/*; do
             if [ -d "$skill_dir" ]; then
-                local skill_name=$(basename "$skill_dir")
+                local skill_name
+                skill_name=$(basename "$skill_dir")
                 local target_dir="$SKILLS_DIR/$skill_name"
 
                 if [ -d "$target_dir" ] || [ -L "$target_dir" ]; then
@@ -256,7 +261,8 @@ uninstall() {
     if [ -d "$REPO_ROOT/agents" ]; then
         for agent_dir in "$REPO_ROOT/agents"/*; do
             if [ -d "$agent_dir" ]; then
-                local agent_name=$(basename "$agent_dir")
+                local agent_name
+                agent_name=$(basename "$agent_dir")
                 local target_dir="$AGENTS_DIR/$agent_name"
 
                 if [ -d "$target_dir" ] || [ -L "$target_dir" ]; then

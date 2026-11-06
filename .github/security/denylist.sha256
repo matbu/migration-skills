@@ -1,0 +1,10 @@
+# sha256 of lowercased internal identifiers that must never appear in this repo
+# (internal namespaces, personal key names, usernames, internal host aliases...).
+# Only hashes are stored so this file leaks nothing.
+#
+# Add an entry:   python3 -I .github/security/check_content.py --hash <token>
+# Tokens are matched as whole words (and as their '.'/'_'-separated parts),
+# case-insensitively. Keep a non-revealing comment after '#'.
+4faa4fcf1dfbd9170e6c1888810ed6c760107893c49116646bab90115ac871d9  # internal CI namespace
+33a399f4c36fd28ab92ea30e326825f839c0891ea0151427330e2842eb1953b9  # personal SSH key name
+94060df5737c9b98e1303f172c3274baa9a42465afb19791c7cacd6356394c9f  # personal username

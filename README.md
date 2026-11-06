@@ -106,6 +106,15 @@ skills/my-new-skill/
 └── tests/                # Skill tests
 ```
 
+## Security
+
+Every pull request goes through automated security checks: secret scanning
+(gitleaks, trufflehog), detection of internal leaks and dangerous commands,
+skill-specific risks (prompt injection, permission bypass, hidden Unicode),
+shellcheck/bandit, and workflow hardening (zizmor). Run them locally with
+`scripts/security-check.sh`. See [SECURITY-CHECKS.md](SECURITY-CHECKS.md) for details
+and for how to handle false positives.
+
 ## Contributing
 
 Contributions are welcome! Whether you're fixing bugs, adding new skills, or improving documentation:
@@ -123,6 +132,7 @@ Contributions are welcome! Whether you're fixing bugs, adding new skills, or imp
 - Add tests for new functionality
 - Follow existing naming conventions
 - Keep skills focused and composable
+- Run `scripts/security-check.sh` before pushing; never commit real IPs, hostnames, keys or tokens
 
 ## Use Cases
 
