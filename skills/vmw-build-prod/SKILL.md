@@ -1,7 +1,7 @@
 ---
 name: vmw-build-prod
-description: Build production VMware Migration Kit collection on x86_64 architecture (local or remote)
-version: 1.0
+description: Build production VMware Migration Kit collection on x86_64 architecture (local or remote) and optionally publish it to Ansible Galaxy once all post-build checks pass
+version: 1.1
 ---
 
 # VMware Migration Kit Production Build
@@ -25,6 +25,12 @@ The skill accepts these optional arguments (space-separated):
 2. `<build-machine-ip>` - IP address of remote build machine (default: local build)
 3. `<ssh-user>` - SSH user for remote build (default: current user, only used for remote builds)
 
+Optional flags (can appear anywhere):
+- `--publish` - Publish the tarball to Ansible Galaxy after **all** post-build checks are green
+- `--api-key KEY` - Ansible Galaxy API key (required with `--publish`; falls back to the `GALAXY_API_KEY` env var)
+
+To pass flags while keeping the default version, use `latest` as the first positional argument.
+
 ## Usage Examples
 
 ```bash
@@ -39,6 +45,12 @@ The skill accepts these optional arguments (space-separated):
 
 # Build specific version on remote machine with custom user
 /vmw-build-prod v2.2.4 192.168.1.100 builder
+
+# Build remotely, then publish to Galaxy if all checks pass
+/vmw-build-prod 2.2.4 192.168.1.100 builder --publish --api-key YOUR_KEY
+
+# Build locally (x86_64) and publish, key from environment
+GALAXY_API_KEY=YOUR_KEY /vmw-build-prod 2.2.4 --publish
 ```
 
 ## Manual Execution
@@ -52,6 +64,7 @@ You can also run the script directly without Claude Code:
 # Examples
 ./.claude/skills/vmw-build-prod/scripts/build.sh v2.2.4
 ./.claude/skills/vmw-build-prod/scripts/build.sh latest 192.168.1.100 builder
+./.claude/skills/vmw-build-prod/scripts/build.sh 2.2.4 192.168.1.100 builder --publish --api-key YOUR_KEY
 ```
 
 ## Build Process
@@ -79,6 +92,18 @@ The script performs these steps:
    - Verify binary architecture remotely
    - SCP tarball to local `$HOME/Downloads/`
    - Clean up remote temp directory
+6. **Publish pre-flight** (only with `--publish`, runs *before* building): API key present and `ansible-galaxy` available locally — fails fast otherwise
+7. **Post-build checks** (always run on the local tarball in `~/Downloads/`):
+   - Tarball is non-empty and a valid gzip archive
+   - Packaged `plugins/modules/migrate` is an **ELF 64-bit x86-64** binary
+   - Collection version matches the requested tag (leading `v` stripped) — error when publishing, warning otherwise
+   - With `--publish`: that version is not already on Galaxy
+8. **Publish** (only with `--publish` and all checks green): `ansible-galaxy collection publish` from the local machine. If publish fails the local tarball is kept.
+
+## API Key Security
+
+- Never echo, log, or display the API key value. The script masks it in `ansible-galaxy` output.
+- When reporting back to the user, do not repeat the key.
 
 ## Expected Output
 
@@ -100,6 +125,7 @@ VMware Migration Kit Production Build:
 ✅ Build: SUCCESS
 ✅ Binary verification: migrate is x86-64 ELF
 ✅ Output: ~/Downloads/os_migrate-vmware_migration_kit-2.2.4.tar.gz
+✅ Post-build checks: all passed
 ```
 
 Or for remote build:
@@ -113,4 +139,6 @@ VMware Migration Kit Production Build:
 ✅ Binary verification: migrate is x86-64 ELF
 ✅ Downloaded: ~/Downloads/os_migrate-vmware_migration_kit-2.2.4.tar.gz
 ✅ Remote cleanup: SUCCESS
+✅ Post-build checks: archive OK, ELF x86-64, version matches tag, not yet on Galaxy
+✅ Published: https://galaxy.ansible.com/ui/repo/published/os_migrate/vmware_migration_kit/
 ```
