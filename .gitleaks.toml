@@ -1,0 +1,35 @@
+# gitleaks configuration for migration-skills
+# Uses the full upstream ruleset plus a few repo-specific rules.
+title = "migration-skills gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "ansible-galaxy-api-key"
+description = "Ansible Galaxy API key passed on the command line or in config"
+regex = '''(?i)(?:--api-key|galaxy[_-]?(?:api[_-]?)?(?:key|token)|GALAXY_API_KEY)["']?\s*[=: ]\s*["']?([0-9a-f]{40})\b'''
+secretGroup = 1
+keywords = ["api-key", "galaxy"]
+
+[[rules]]
+id = "openstack-password"
+description = "Hard-coded OpenStack password"
+regex = '''(?i)\bOS_PASSWORD["']?\s*[=:]\s*["']?([^\s"'$<{]{6,})'''
+secretGroup = 1
+keywords = ["os_password"]
+
+[[rules]]
+id = "vcenter-password"
+description = "Hard-coded vCenter / VMware password"
+regex = '''(?i)\b(?:vcenter|vmware|vsphere|esxi)[_-]?(?:password|passwd|pass)["']?\s*[=:]\s*["']?([^\s"'$<{]{6,})'''
+secretGroup = 1
+keywords = ["vcenter", "vmware", "vsphere", "esxi"]
+
+[allowlist]
+description = "Self-tests build fake secrets at runtime; scanner sources define patterns"
+paths = [
+  '''^\.github/security/test_check_content\.py$''',
+  '''^\.github/security/check_content\.py$''',
+  '''^\.github/security/denylist\.sha256$''',
+]

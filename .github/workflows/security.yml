@@ -1,0 +1,147 @@
+name: Security checks
+
+# Blocks PRs that leak secrets or internal info, or that add dangerous
+# commands / agent-instruction risks to the skills. See SECURITY-CHECKS.md.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 5 * * 1" # weekly full-history rescan (new detector rules)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GITLEAKS_VERSION: "8.30.1"
+  GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+  TRUFFLEHOG_VERSION: "3.99.8"
+  BANDIT_VERSION: "1.9.4"
+  ZIZMOR_VERSION: "1.32.0"
+
+jobs:
+  content:
+    name: Leaks, dangerous commands & skill risks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Self-test the checker
+        run: python3 -I -m unittest discover -s .github/security -p 'test_*.py' -v
+
+      - name: Scan current tree
+        run: python3 -I .github/security/check_content.py
+
+      - name: Scan every commit of the PR (content removed later still lands in history)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 -I .github/security/check_content.py --commits "${BASE_SHA}..${HEAD_SHA}"
+
+  gitleaks:
+    name: Secrets (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks (pinned, checksum verified)
+        run: |
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "${RUNNER_TEMP}/gitleaks.tgz" "$url"
+          echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/gitleaks.tgz" | sha256sum -c -
+          tar -xzf "${RUNNER_TEMP}/gitleaks.tgz" -C "${RUNNER_TEMP}" gitleaks
+
+      - name: Scan working tree
+        run: |
+          "${RUNNER_TEMP}/gitleaks" dir . --config .gitleaks.toml --redact --no-banner
+
+      - name: Scan git history (PR commits, or full history otherwise)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            set -- "--log-opts=${BASE_SHA}..${HEAD_SHA}"
+          else
+            set --
+          fi
+          "${RUNNER_TEMP}/gitleaks" git . --config .gitleaks.toml --redact --no-banner "$@"
+
+  trufflehog:
+    name: Secrets (trufflehog, verified + unknown)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: trufflesecurity/trufflehog@ea68ca03c865c5f324e86e849ced20ed3cf9dbbb # v3.99.8
+        with:
+          version: ${{ env.TRUFFLEHOG_VERSION }}
+          extra_args: --results=verified,unknown
+
+  code:
+    name: Script analysis (shellcheck, bandit)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: shellcheck (warning and above)
+        run: |
+          shellcheck --version
+          git ls-files -z '*.sh' '*.bash' | xargs -0 -r shellcheck -S warning -f gcc
+
+      - name: bandit (medium+ severity and confidence)
+        run: |
+          python3 -m pip install --disable-pip-version-check -q "bandit==${BANDIT_VERSION}"
+          # all code, full ruleset
+          bandit -r . -x './.git,*/test_*.py' -ll -ii
+          # tests: B108 (/tmp literal) is noise in mocked unit tests
+          git ls-files -z '*test_*.py' | xargs -0 -r bandit -ll -ii -s B108
+
+  workflows:
+    name: Workflow security (zizmor)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: zizmor
+        run: |
+          python3 -m pip install --disable-pip-version-check -q "zizmor==${ZIZMOR_VERSION}"
+          zizmor --offline --format=github .github/workflows

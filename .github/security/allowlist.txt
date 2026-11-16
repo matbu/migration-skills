@@ -1,0 +1,42 @@
+# Allowlist for .github/security/check_content.py
+#
+# Format (whitespace separated, one entry per line):
+#   <rule-id|*>  <path-glob>  [python-regex]
+#
+# - rule-id: rule to silence (see check_content.py), or * for any rule
+# - path-glob: fnmatch glob on the repo-relative path (* matches across /)
+# - regex (optional): silence only when it matches the flagged text or the
+#   whole line. Without a regex, every finding of that rule in matching
+#   files is silenced -- avoid that.
+#
+# Prefer fixing the content: use RFC 5737 documentation IPs (192.0.2.x,
+# 198.51.100.x, 203.0.113.x), <placeholders>, or env vars. For a single line
+# you can also add an inline comment:  security-check: allow <rule-id>
+#
+# Every entry must be reviewed in the PR that adds it.
+
+# --- Reviewed documentation example IPs (generic, not real hosts) ----------
+private-ip  skills/*  ^192\.168\.1\.(10|20|100)$
+private-ip  skills/*  ^10\.0\.108\.50$
+private-ip  skills/*  ^10\.0\.0\.1$
+
+# --- Well-known defaults --------------------------------------------------
+# devstack default public/floating range
+private-ip  skills/*  ^172\.24\.4\.\d{1,3}$
+# libvirt/vagrant default network gateway
+private-ip  skills/*  ^192\.168\.121\.2$
+# check-conv-host examples (devstack-style conversion host / keystone)
+private-ip  skills/check-conv-host/*  ^172\.24\.0\.(1|211)$
+
+# --- The checker's own fixtures and documentation quote the patterns -------
+# (only the dangerous-pattern rules are silenced; leak/secret rules still apply)
+reverse-shell         .github/security/test_check_content.py
+disk-wipe             .github/security/test_check_content.py
+credential-exfil      .github/security/test_check_content.py
+permission-bypass     .github/security/test_check_content.py
+claude-config-tamper  .github/security/test_check_content.py
+pipe-to-shell         SECURITY-CHECKS.md  Dangerous commands
+prompt-injection      SECURITY-CHECKS.md  Agent / skill risks
+permission-bypass     SECURITY-CHECKS.md  Agent / skill risks
+chmod-world-writable  SECURITY-CHECKS.md  only \*\*warns\*\*
+sudo-nopasswd         SECURITY-CHECKS.md  only \*\*warns\*\*
