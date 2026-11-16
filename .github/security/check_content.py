@@ -74,12 +74,13 @@ def _redact(text: str) -> str:
 
 PLACEHOLDER_RE = re.compile(
     r"(?i)(change.?me|example|sample|dummy|fake|placeholder|your[_-]|my[_-]|"
-    r"redacted|xxx|\*\*\*|<[^>]*>|\$\{?[A-Za-z_]|\{\{|%\(|secret_name|"
+    r"redacted|xxx|\*\*\*|<[^>]*>|\$\{?[A-Za-z_0-9@*#?!$-]|\$\(|\{\{|%\(|secret_name|"
     r"password$|passw0rd$|^test|todo)"
 )
 
 
 def _not_placeholder(m: re.Match) -> bool:
+    # any shell expansion ($VAR, ${1#..}, $@, $(cmd)) is a runtime value, never a literal secret
     value = m.group("value")
     return not PLACEHOLDER_RE.search(value)
 
