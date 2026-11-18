@@ -47,7 +47,7 @@ This skill automates the release process for os-migrate by:
 4. **Update files**:
    - `galaxy.yml`: version field
    - `plugins/module_utils/const.py`: OS_MIGRATE_VERSION constant
-   - `CHANGELOG.rst`: add new version section with entries
+   - `CHANGELOG.rst`: append a new version section with entries at the **end** of the file (versions are listed oldest first)
    - `aee/execution-environment.yml`: tarball reference
    - `aee/requirements.yml`: collection source path
    - `docs/src/user/walkthrough.rst`: version example
@@ -89,7 +89,10 @@ You are responsible for:
 
 3. **Getting changelog entries** by either:
    - Using provided `--changelog` entries
-   - Analyzing git commits since last version tag: `git log v1.0.3..HEAD --oneline`
+   - Analyzing git commits since the last release tag. os-migrate tags have **no `v` prefix**
+     (`1.0.3`, not `v1.0.3`): `git log 1.0.3..HEAD --oneline`. If the tag is missing
+     locally, run `git fetch --tags` first, or fall back to the previous "Bump ... release"
+     commit: `git log --oneline $(git log -1 --format=%H --grep='^Bump .*release to 1.0.3')..HEAD`
    - Asking the user with AskUserQuestion
 
 4. **Updating galaxy.yml**:
@@ -102,16 +105,33 @@ You are responsible for:
    OS_MIGRATE_VERSION = "1.0.4"  # updated by build.sh  (old: 1.0.3)
    ```
 
-6. **Updating CHANGELOG.rst** by adding new section after "Unreleased":
+6. **Updating CHANGELOG.rst** by appending a new section at the **end of the file**.
+   `CHANGELOG.rst` lists versions **oldest first** (1.0.2, 1.0.3, ... newest last) and has
+   **no "Unreleased" section**: do not insert the new section at the top or between
+   existing versions (certification review flagged 1.1.2 being listed before 1.1.1).
+
+   Before editing, check the new version is greater than the last one listed:
+   ```bash
+   grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' CHANGELOG.rst | tail -1   # must be < new version
+   ```
+
+   Append, separated from the previous section by one blank line:
    ```rst
    1.0.4
    -----
-   
+
    - Changelog entry 1
    - Changelog entry 2
    - Changelog entry 3
    ```
-   Note: The CHANGELOG.rst follows RST format, not Markdown. Keep "Unreleased" section at the top.
+   Note: CHANGELOG.rst is RST, not Markdown. The `-----` underline must be at least as
+   long as the version string.
+
+   After editing, verify the version headings are still in ascending order (prints
+   nothing and exits 0 when correct; works with macOS and GNU `sort`):
+   ```bash
+   grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' CHANGELOG.rst | sort -V -C && echo "CHANGELOG order OK"
+   ```
 
 7. **Updating aee/execution-environment.yml**:
    ```yaml
@@ -144,7 +164,9 @@ You are responsible for:
     Afterwards, `git grep -n "<old version>" -- ':!CHANGELOG.rst'` must return nothing
     (except intentionally old examples in walkthrough.rst like `0.17.0`).
 
-11. **Creating a git commit** (ask user first):
+11. **Creating a git commit** (only after explicit user approval):
+    Leave all changes **unstaged** so the user can review them with `git diff`, then ask.
+    Do not run `git add` or `git commit` until the user explicitly says OK.
     ```bash
     git add galaxy.yml plugins/module_utils/const.py CHANGELOG.rst aee/execution-environment.yml aee/requirements.yml docs/src/user/walkthrough.rst tests/func/tasks/tenant/data/validate_data_dir
     git commit -m "Bump minor release to 1.0.4"
@@ -156,7 +178,7 @@ You are responsible for:
 ## Important Notes
 
 - **Always validate the version format**: Must be semantic versioning (MAJOR.MINOR.PATCH)
-- **Preserve CHANGELOG.rst formatting**: Follow existing RST structure, keep "Unreleased" section
+- **Preserve CHANGELOG.rst formatting**: Follow existing RST structure; versions are oldest first, so the new section always goes at the end (there is no "Unreleased" section)
 - **Check for unreleased changes**: If no commits since last tag and no changelog provided, warn the user
 - **Don't create git tag**: The tag should be created manually or by CI after PR merge
 - **Verify current branch**: Warn if on `main` branch (should create feature branch first)
@@ -165,6 +187,8 @@ You are responsible for:
 ## Error Handling
 
 - If version already exists in CHANGELOG.rst: error and exit
+- If the new version is not greater than the last version in CHANGELOG.rst: error and exit
+- If the CHANGELOG.rst order check (`sort -V -C`) fails after editing: fix the order before continuing
 - If no changelog entries provided/found: prompt user
 - If uncommitted changes exist: warn user
 - If version format invalid: error with example
